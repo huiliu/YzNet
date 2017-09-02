@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -38,6 +39,10 @@ namespace Server
             Array.Copy(data, b, count);
             Console.WriteLine("收到消息：{0}", Encoding.UTF8.GetString(b));
             return Task.Run(() => { });
+        }
+
+        public void OnUdpMessageReceived(UdpReceiveResult result, UdpServer server)
+        {
         }
     }
 }

@@ -35,7 +35,7 @@ namespace Server
         public void Close()
         {
             state = SessionState.Closed;
-            SessionMgr.Instance.HandleSessionClosedEvent(this);
+            TcpSessionMgr.Instance.HandleSessionClosed(this);
 
             client.Close();
             dispatcher.OnDisconnected(this);

@@ -79,6 +79,11 @@ namespace Server
             OnNewConnection?.Invoke(client);
         }
 
+        public Task SendMessage(byte[] buff, object obj = null)
+        {
+            throw new NotImplementedException();
+        }
+
         private int port;
         private TcpListener listener;
         private ServerState state;

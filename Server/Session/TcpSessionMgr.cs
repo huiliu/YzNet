@@ -8,10 +8,10 @@ using System.Net.Sockets;
 
 namespace Server
 {
-    class SessionMgr : IDisposable
+    class TcpSessionMgr : IDisposable
     {
-        public static SessionMgr Instance = new SessionMgr();
-        private SessionMgr() { }
+        public static TcpSessionMgr Instance = new TcpSessionMgr();
+        private TcpSessionMgr() { }
 
         public void Init()
         {
@@ -22,18 +22,21 @@ namespace Server
             sessionDict.Clear();
         }
 
-        public void CreateTcpSession(TcpClient client)
+        public void HandleNewSession(TcpClient client)
         {
-
             var newId = getSessionId();
             Session newSession = new TcpSession(newId, client);
             sessionDict.TryAdd(newId, newSession);
 
             newSession.SetMessageDispatcher(UnAuthorizedDispatcher.Instance);
             newSession.Start();
+
+            // Test代码
+            // 向客户端发送UDP会话标识码
+            newSession.SendMessage(Encoding.UTF8.GetBytes(UdpSessionMgr.Instance.GetFreeConv().ToString()));
         }
 
-        public void HandleSessionClosedEvent(Session s)
+        public void HandleSessionClosed(Session s)
         {
             Session unuse;
             sessionDict.TryRemove(s.GetId(), out unuse);

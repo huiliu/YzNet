@@ -26,5 +26,7 @@ namespace Server
 
         void StartServiceOn(ServerConfig cfg);
         void Stop();
+
+        Task SendMessage(byte[] buff, object obj = null);
     }
 }

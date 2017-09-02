@@ -15,9 +15,13 @@ namespace Server
             cfg.Port = 1234;
 
             TcpServer s = new TcpServer();
+            s.OnNewConnection += TcpSessionMgr.Instance.HandleNewSession;
             s.StartServiceOn(cfg);
 
-            s.OnNewConnection += SessionMgr.Instance.CreateTcpSession;
+
+            UdpServer us = new UdpServer();
+            us.OnReceiveMessage += UdpSessionMgr.Instance.HandleReceiveMessage;
+            us.StartServiceOn(cfg);
 
             CommandDispatcher.Instance.Start();
         }

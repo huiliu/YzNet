@@ -1,6 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -8,31 +7,75 @@ using System.Threading.Tasks;
 
 namespace Server
 {
-    class UdpSession : Session
+    class UdpSession : Session, IDisposable
     {
-        public UdpSession(IPEndPoint clientEndPoint)
+        private static readonly DateTime utc_time = new DateTime(1970, 1, 1);
+
+        public static UInt32 iclock()
+        {
+            return (UInt32)(Convert.ToInt64(DateTime.UtcNow.Subtract(utc_time).TotalMilliseconds) & 0xffffffff);
+        }
+
+        public UdpSession(uint conv, IPEndPoint clientEndPoint, UdpServer server)
         {
             this.remoteEndPoint = clientEndPoint;
+            this.server = server;
+            this.state = SessionState.Closed;
+
+            this.needUpdateFlag   = false;
+            this.nextUpdateTimeMs = iclock();
+
+            kcp = new KCP(conv, async (buff, sz) =>
+            {
+                try
+                {
+                    // 将KCP中消息通过UDP Server发送给目标
+                    await server.SendMessage(buff, remoteEndPoint);
+                }
+                catch (Exception e)
+                {
+
+                }
+            });
+
+            // TODO: 配置KCP参数
+        }
+
+        public void Dispose()
+        {
         }
 
         public void Start()
         {
-            throw new NotImplementedException();
+            state = SessionState.Start;
+
+            Task.Run(async () =>
+            {
+                while (state == SessionState.Start)
+                {
+                    update(iclock());
+                    await Task.Delay(10);
+                }
+            });
         }
 
         public void Close()
         {
-            throw new NotImplementedException();
+            state = SessionState.Closed;
         }
 
         public void SetMessageDispatcher(MessageDispatcher dispatcher)
         {
-            throw new NotImplementedException();
+            this.dispatcher = dispatcher;
         }
 
-        public Task SendMessage(byte[] buffer)
+        // 发送网络消息
+        public async Task SendMessage(byte[] buffer)
         {
-            throw new NotImplementedException();
+            // 将消息交给KCP
+            int ret = kcp.Send(buffer);
+            Debug.Assert(ret == 0, "Send Data to KCP Failed!", "UDP");
+            needUpdateFlag = true;
         }
 
         public Task SendMessage(byte[] buffer, int offset, int count)
@@ -40,13 +83,56 @@ namespace Server
             throw new NotImplementedException();
         }
 
-        public uint GetId()
+        // "处理"收到的网络消息
+        public void OnReceiveMessage(byte[] buff)
         {
-            return id;
+            // 交给KCP处理
+            var ret = kcp.Input(buff);
+            Debug.Assert(ret == 0, "KCP INPUT数据出错！", "UDP");
+            needUpdateFlag = true;
+
+            // 读取KCP中的消息
+            for (var sz = kcp.PeekSize(); sz > 0; sz = kcp.PeekSize())
+            {
+                byte[] b = new byte[sz];
+                if (kcp.Recv(b) > 0)
+                {
+                    // 将消息分发
+                    dispatcher.OnMessageReceived(this, b, 0, sz);
+                }
+            }
         }
 
-        private uint id;
-        private UdpClient server;
+        // 定时调用
+        // TODO: 调用频繁，每个连接一个
+        private void update(UInt32 currentMs)
+        {
+            if (currentMs >= nextUpdateTimeMs ||
+                needUpdateFlag)
+            {
+                kcp.Update(currentMs);
+
+                nextUpdateTimeMs = kcp.Check(currentMs);
+                needUpdateFlag   = false;
+            }
+        }
+
+        public uint GetId()
+        {
+            return conv;
+        }
+
+        private MessageDispatcher dispatcher;
         private IPEndPoint remoteEndPoint;
+        private UdpServer server;
+        private SessionState state;
+
+        #region KCP相关
+        private uint conv;
+        private KCP  kcp;
+        private bool needUpdateFlag;
+        private UInt32 nextUpdateTimeMs;
+
+        #endregion
     }
 }

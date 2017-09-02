@@ -14,7 +14,7 @@ namespace Server
         public event Action OnErrorCallback;
         public event Action<UdpClient> OnNewConnection;
 
-        public event Action<UdpReceiveResult> OnReceiveMessage;
+        public event Action<UdpReceiveResult, UdpServer> OnReceiveMessage;
 
         public UdpServer()
         {
@@ -25,7 +25,7 @@ namespace Server
         public void StartServiceOn(ServerConfig cfg)
         {
             if (state != ServerState.Closed ||
-                cfg != null ||
+                cfg == null ||
                 lisener != null)
             {
                 Debug.Assert(false, "Server已经启动!", "Server");
@@ -64,13 +64,22 @@ namespace Server
 
         public void handleReceiveMessage(UdpReceiveResult result)
         {
-            OnReceiveMessage?.Invoke(result);
+            OnReceiveMessage?.Invoke(result, this);
         }
 
         public void Stop()
         {
             state = ServerState.Closed;
             lisener.Close();
+        }
+
+        public async Task SendMessage(byte[] buff, object obj = null)
+        {
+            if (obj is IPEndPoint)
+            {
+                int count = await lisener.SendAsync(buff, buff.Length, obj as IPEndPoint);
+                Debug.Assert(count == buff.Length, "发送数据不完整！", "Server");
+            }
         }
 
         private ServerState state;
