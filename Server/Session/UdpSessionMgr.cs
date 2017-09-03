@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
 
 namespace Server
 {
@@ -32,12 +33,14 @@ namespace Server
             }
             else if (sessionIdWait.ContainsKey(conv))
             {
+                Console.WriteLine("Udp receive: {0}", data);
                 // 新连接的客户端
                 OnNewConnection(conv, remoteEndPoint, server);
             }
             else
             {
-                Debug.Assert(false, "收到无效kcp/UDP包");            
+                // 没有认证的客户端连接
+                Console.WriteLine(string.Format("收到无效kcp/UDP包: {0}", Encoding.UTF8.GetString(data)), this.ToString());
             }
         }
 

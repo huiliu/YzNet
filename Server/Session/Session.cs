@@ -15,7 +15,7 @@ namespace Server
     }
 
     // 表示一个会话，可能是TCP，也可能是UDP
-    interface Session
+    public interface Session
     {
         void Start();
         void Close();

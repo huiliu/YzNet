@@ -9,7 +9,7 @@ using System.Net.Sockets;
 
 namespace Server
 {
-    class UdpServer : Server<UdpClient>
+    public class UdpServer : Server<UdpClient>
     {
         public event Action OnErrorCallback;
         public event Action<UdpClient> OnNewConnection;

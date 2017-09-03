@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Server
 {
-    class CommandDispatcher : MessageDispatcher, IDisposable
+    public class CommandDispatcher : MessageDispatcher, IDisposable
     {
         public static MessageDispatcher Instance = new CommandDispatcher();
         private CommandDispatcher()

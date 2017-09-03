@@ -9,7 +9,7 @@ namespace Server
 {
     // TODO:
     // 1. 连接数限制
-    class TcpServer : Server<TcpClient>
+    public class TcpServer : Server<TcpClient>
     {
         public event Action<TcpClient>  OnNewConnection;
 

@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace Server
 {
-    class TcpSession : Session
+    public class TcpSession : Session
     {
         public TcpSession(uint id, TcpClient client)
         {

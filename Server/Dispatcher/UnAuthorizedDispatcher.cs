@@ -13,7 +13,7 @@ namespace Server
     // 2. 协商加密方法
     // ...
     // 通过认证后把sesstion的MessageDispatcher设置为其它
-    class UnAuthorizedDispatcher : MessageDispatcher
+    public class UnAuthorizedDispatcher : MessageDispatcher
     {
         public static MessageDispatcher Instance = new UnAuthorizedDispatcher();
         private UnAuthorizedDispatcher() { }

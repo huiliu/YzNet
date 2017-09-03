@@ -7,15 +7,8 @@ using System.Threading.Tasks;
 
 namespace Server
 {
-    class UdpSession : Session, IDisposable
+    public class UdpSession : Session, IDisposable
     {
-        private static readonly DateTime utc_time = new DateTime(1970, 1, 1);
-
-        public static UInt32 iclock()
-        {
-            return (UInt32)(Convert.ToInt64(DateTime.UtcNow.Subtract(utc_time).TotalMilliseconds) & 0xffffffff);
-        }
-
         public UdpSession(uint conv, IPEndPoint clientEndPoint, UdpServer server)
         {
             this.remoteEndPoint = clientEndPoint;
@@ -23,7 +16,7 @@ namespace Server
             this.state = SessionState.Closed;
 
             this.needUpdateFlag   = false;
-            this.nextUpdateTimeMs = iclock();
+            this.nextUpdateTimeMs = Utils.IClock();
 
             kcp = new KCP(conv, async (buff, sz) =>
             {
@@ -53,7 +46,7 @@ namespace Server
             {
                 while (state == SessionState.Start)
                 {
-                    update(iclock());
+                    update(Utils.IClock());
                     await Task.Delay(10);
                 }
             });

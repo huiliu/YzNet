@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace Server
 {
     // 消息分发器
-    interface MessageDispatcher
+    public interface MessageDispatcher
     {
         void Start();
         void Stop();
