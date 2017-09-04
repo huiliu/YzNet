@@ -8,6 +8,8 @@ using System.Threading.Tasks;
 
 namespace Server
 {
+    // TCP会话
+    // 表示一条TCP连接
     public class TcpSession : Session
     {
         public TcpSession(uint id, TcpClient client)
@@ -17,13 +19,15 @@ namespace Server
             this.stream = client.GetStream();
         }
 
+        // 启动会话
+        // 开始接收网络消息
         public void Start()
         {
             Debug.Assert(stream.CanRead, "Socket没有连接！", "Session");
 
             state  = SessionState.Start;
 
-            // 开始接收消息
+            // 在一个独立的线程开始接收消息
             Task.Run(async () =>
             {
                 while(state != SessionState.Closed)
@@ -31,6 +35,7 @@ namespace Server
             });
         }
 
+        // 关闭Session
         public void Close()
         {
             state = SessionState.Closed;
@@ -40,25 +45,28 @@ namespace Server
             dispatcher.OnDisconnected(this);
         }
 
+        // 设置网络消息分发器
         public void SetMessageDispatcher(MessageDispatcher dispatcher)
         {
             this.dispatcher = dispatcher;
         }
 
+        // 开始接收网络消息
+        // TODO: 处理粘包问题，减少拷贝开销
         private async Task startReceive()
         {
             const int bufferSize = 1024;
-            byte[] buffer = new byte[bufferSize];
-            int count = 0;
+            byte[] receiveBuffer = new byte[bufferSize];
+            int receivedSize = 0;
+
             try
             {
-                count = await stream.ReadAsync(buffer, 0, bufferSize);
-
-            if (count == 0)
-            {
-                Close();
-                return;
-            }
+                receivedSize = await stream.ReadAsync(receiveBuffer, 0, bufferSize);
+                if (receivedSize == 0)
+                {
+                    Close();
+                    return;
+                }
             }
             catch (Exception e)
             {
@@ -66,8 +74,9 @@ namespace Server
                 Close();
                 return;
             }
+
             // 消息应该放入主线程处理
-            await dispatcher.OnMessageReceived(this, buffer, 0, count);
+            await dispatcher.OnMessageReceived(this, receiveBuffer, 0, receivedSize);
         }
 
         // 发送消息
@@ -87,6 +96,7 @@ namespace Server
         // 非线程安全
         private async Task sendMessageImpl(byte[] buffer, int offset, int count)
         {
+            Debug.Assert(state == SessionState.Start, "会话没有启动！", this.ToString());
             // TODO: 线程安全问题
             try
             {

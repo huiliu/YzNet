@@ -19,7 +19,7 @@ namespace Server
             s.StartServiceOn(cfg);
 
             UdpServer us = new UdpServer();
-            us.OnReceiveMessage += UdpSessionMgr.Instance.HandleReceiveMessage;
+            us.OnReceiveMessage += UDPMessageDispatcher.Instance.HandleReceiveMessage;
             us.StartServiceOn(cfg);
 
             ClientCfg clientCfg = new ClientCfg();

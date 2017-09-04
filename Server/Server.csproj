@@ -63,13 +63,17 @@
     <Compile Include="Client\AsyncTcpClient.cs" />
     <Compile Include="Client\AsyncUdpClient.cs" />
     <Compile Include="Dispatcher\CommandDispatcher.cs" />
+    <Compile Include="Dispatcher\UDPMessageDispatcher.cs" />
     <Compile Include="Kcp\kcp.cs" />
     <Compile Include="Kcp\switch_queue.cs" />
+    <Compile Include="Message\CmdRPCRequest.cs" />
     <Compile Include="Message\CmdVersion.cs" />
     <Compile Include="Message\MsgDelayTest.cs" />
     <Compile Include="Message\MsgPing.cs" />
     <Compile Include="Message\MsgPong.cs" />
+    <Compile Include="Message\MsgRPCResponse.cs" />
     <Compile Include="Message\MsgUdpKey.cs" />
+    <Compile Include="RPC\RPCService.cs" />
     <Compile Include="Server\UdpServer.cs" />
     <Compile Include="Session\TcpSessionMgr.cs" />
     <Compile Include="Dispatcher\MessageDispatcher.cs" />
@@ -88,6 +92,7 @@
     <None Include="App.config" />
     <None Include="packages.config" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

@@ -7,48 +7,53 @@ using System.Text;
 
 namespace Server
 {
-    class UdpSessionMgr : IDisposable
+    // UDP会话管理
+    public class UdpSessionMgr : IDisposable
     {
+        public event Action<UdpSession> OnSessionCreate;
+        public event Action<UdpSession> OnSessionClosed;
+
         public static UdpSessionMgr Instance = new UdpSessionMgr();
         private UdpSessionMgr() { }
+
         public void Dispose()
         {
             sessionDict.Clear();
             sessionIdWait.Clear();
         }
 
-        public void HandleReceiveMessage(UdpReceiveResult result, UdpServer server)
+        // 
+        public UdpSession GetOrCreateUDPSession(UInt32 conv, IPEndPoint remoteEndPoint, UdpServer server)
         {
-            var remoteEndPoint = result.RemoteEndPoint;
-            var data = result.Buffer;
-
-            uint conv = 0;
-            KCP.ikcp_decode32u(data, 0, ref conv);
-
             if (sessionDict.ContainsKey(conv))
             {
                 // 已连接的客户端
-                var session = sessionDict[conv];
-                session.OnReceiveMessage(data);
+                return sessionDict[conv];
             }
             else if (sessionIdWait.ContainsKey(conv))
             {
-                Console.WriteLine("Udp receive: {0}", data);
                 // 新连接的客户端
                 OnNewConnection(conv, remoteEndPoint, server);
             }
             else
             {
                 // 没有认证的客户端连接
-                Console.WriteLine(string.Format("收到无效kcp/UDP包: {0}", Encoding.UTF8.GetString(data)), this.ToString());
+                Console.WriteLine(string.Format("收到无效KCP/UDP包！ conv:{0}", conv), this.ToString());
             }
+
+            return null;
         }
 
-        public void OnNewConnection(uint conv, IPEndPoint remoteEndPoint, UdpServer server)
+        // 创建一个新的UDP会话
+        private void OnNewConnection(uint conv, IPEndPoint remoteEndPoint, UdpServer server)
         {
             var newSession = new UdpSession(conv, remoteEndPoint, server);
+            newSession.SetMessageDispatcher(UDPMessageDispatcher.Instance);
+
             sessionDict.TryAdd(conv, newSession);
             sessionIdWait.TryRemove(conv, out conv);
+
+            OnSessionCreate?.Invoke(newSession);
 
             newSession.Start();
         }

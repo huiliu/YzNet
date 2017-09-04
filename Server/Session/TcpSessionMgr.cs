@@ -6,10 +6,13 @@ using System.Threading.Tasks;
 using System.Net;
 using System.Net.Sockets;
 
+using MessagePack;
+using Server.Message;
+
 namespace Server
 {
     // 管理TCP会话连接
-    class TcpSessionMgr : IDisposable
+    public class TcpSessionMgr : IDisposable
     {
         public static TcpSessionMgr Instance = new TcpSessionMgr();
         private TcpSessionMgr() { }
@@ -34,7 +37,9 @@ namespace Server
 
             // Test代码
             // 向客户端发送UDP会话标识码
-            newSession.SendMessage(Encoding.UTF8.GetBytes(UdpSessionMgr.Instance.GetFreeConv().ToString()));
+            // newSession.SendMessage(Encoding.UTF8.GetBytes(UdpSessionMgr.Instance.GetFreeConv().ToString()));
+            var key = MsgUdpKey.Pack(1);
+            newSession.SendMessage(MsgUdpKey.Pack(UdpSessionMgr.Instance.GetFreeConv()));
         }
 
         public void HandleSessionClosed(Session s)
