@@ -8,6 +8,7 @@ using System.Net.Sockets;
 
 namespace Server
 {
+    // 管理TCP会话连接
     class TcpSessionMgr : IDisposable
     {
         public static TcpSessionMgr Instance = new TcpSessionMgr();

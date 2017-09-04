@@ -22,6 +22,7 @@ namespace Server
         public AsyncTcpClient(ClientCfg cfg)
         {
             this.cfg = cfg;
+            this.client = new TcpClient();
         }
 
         public void Dispose()

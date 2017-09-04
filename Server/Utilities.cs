@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Server
 {
-    static class Utils
+    public static class Utils
     {
         private static readonly DateTime utc_time = new DateTime(1970, 1, 1);
 

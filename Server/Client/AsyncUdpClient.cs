@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Server
@@ -20,8 +21,17 @@ namespace Server
             this.client = new UdpClient();
             this.kcp = new KCP(conv, async (buff, sz) =>
             {
-                // 将KCP消息发送给服务器
-                await client.SendAsync(buff, sz);
+                try
+                {
+                    // 将KCP消息发送给服务器
+                    byte[] b = new byte[sz];
+                    Buffer.BlockCopy(buff, 0, b, 0, sz);
+                    await client.SendAsync(b, sz);
+                }
+                catch (Exception e)
+                {
+                    shouldBeClose(e);
+                }
             });
 
             kcp.NoDelay(1, 10, 2, 1);
@@ -33,7 +43,7 @@ namespace Server
                 while (true)
                 {
                     kcpUpdate(Utils.IClock());
-                    Task.Delay(10);
+                    Thread.Sleep(5);
                 }
             });
         }
@@ -93,6 +103,11 @@ namespace Server
             Debug.Assert(ret == 0, "KCP INPUT数据出错！", "UDP");
             needUpdateFlag = true;
 
+            checkKcpReceiveMessage();
+        }
+
+        internal void checkKcpReceiveMessage()
+        {
             // 读取KCP中的消息
             for (var sz = kcp.PeekSize(); sz > 0; sz = kcp.PeekSize())
             {
@@ -127,12 +142,15 @@ namespace Server
         // KCP定时Update
         private void kcpUpdate(UInt32 currentMs)
         {
-            if (needUpdateFlag || nextUpdateTimeMs > Utils.IClock())
+            checkKcpReceiveMessage();
+
+            if (needUpdateFlag || currentMs >= nextUpdateTimeMs)
             {
                 kcp.Update(currentMs);
 
                 nextUpdateTimeMs = kcp.Check(currentMs);
                 needUpdateFlag   = false;
+                //Console.WriteLine("Kcp Update: {0}, NextTime: {1}", Utils.IClock(), nextUpdateTimeMs);
             }
         }
 

@@ -4,7 +4,7 @@ namespace Server
 {
 public class KCP
 {
-    public const int IKCP_RTO_NDL     = 30;  // no delay min rto
+    public const int IKCP_RTO_NDL     = 10;  // no delay min rto
     public const int IKCP_RTO_MIN     = 100; // normal min rto
     public const int IKCP_RTO_DEF     = 200;
     public const int IKCP_RTO_MAX     = 60000;

@@ -9,6 +9,7 @@ namespace TestUdpClient
 {
     using Server;
     using Server.Message;
+    using MessagePack;
 
     class Program
     {
@@ -28,7 +29,13 @@ namespace TestUdpClient
 
         private static void handleUdpOnMessageReceived(AsyncUdpClient arg1, byte[] arg2, int arg3, int arg4)
         {
-            Console.WriteLine("Udp收到消息： {0}", Encoding.UTF8.GetString(arg2));
+
+            var msg = MessagePack.MessagePackSerializer.Deserialize<MsgDelayTest>(arg2);
+            msg.ClientReceiveTime = Utils.IClock();
+            Console.WriteLine("Udp收到消息： {0}", msg.ToString());
+
+            msg.ClientSendTime = Utils.IClock();
+            arg1.SendMessage(MessagePack.MessagePackSerializer.Serialize(msg));
         }
 
         private static void handleTcpOnMessageReceived(AsyncTcpClient arg1, byte[] arg2, int arg3, int arg4)
@@ -39,6 +46,12 @@ namespace TestUdpClient
 
             AsyncUdpClient uc = new AsyncUdpClient(cfg, msg.Conv);
             uc.OnMessageReceived += handleUdpOnMessageReceived;
+            uc.Connect();
+
+            MsgDelayTest buff = new MsgDelayTest();
+            buff.ClientSendTime = Utils.IClock();
+
+            uc.SendMessage(MessagePack.MessagePackSerializer.Serialize(buff));
         }
     }
 }

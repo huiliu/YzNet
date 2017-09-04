@@ -5,10 +5,14 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 
+using MessagePack;
+using Server.Message;
+
 namespace Server
 {
     public class UdpSession : Session, IDisposable
     {
+        public event Action<UdpSession, byte[]> OnMessageReceived;
         public UdpSession(uint conv, IPEndPoint clientEndPoint, UdpServer server)
         {
             this.remoteEndPoint = clientEndPoint;
@@ -23,15 +27,20 @@ namespace Server
                 try
                 {
                     // 将KCP中消息通过UDP Server发送给目标
-                    await server.SendMessage(buff, remoteEndPoint);
+                    byte[] b = new byte[sz];
+                    Buffer.BlockCopy(buff, 0, b, 0, sz);
+                    await server.SendMessage(b, remoteEndPoint);
+
                 }
                 catch (Exception e)
                 {
-
+                    shouldBeClose(e);
                 }
             });
 
             // TODO: 配置KCP参数
+            kcp.NoDelay(1, 10, 2, 1);
+            kcp.WndSize(128, 128);
         }
 
         public void Dispose()
@@ -47,7 +56,7 @@ namespace Server
                 while (state == SessionState.Start)
                 {
                     update(Utils.IClock());
-                    await Task.Delay(10);
+                    await Task.Delay(5);
                 }
             });
         }
@@ -55,6 +64,12 @@ namespace Server
         public void Close()
         {
             state = SessionState.Closed;
+        }
+
+        private void shouldBeClose(Exception e)
+        {
+            Console.WriteLine("捕捉到异常！Message: {0}\nStackTrace: {1}\n", e.Message, e.StackTrace);
+            Close();
         }
 
         public void SetMessageDispatcher(MessageDispatcher dispatcher)
@@ -84,6 +99,11 @@ namespace Server
             Debug.Assert(ret == 0, "KCP INPUT数据出错！", "UDP");
             needUpdateFlag = true;
 
+            checkReceiveKcpMessage();
+        }
+
+        internal void checkReceiveKcpMessage()
+        {
             // 读取KCP中的消息
             for (var sz = kcp.PeekSize(); sz > 0; sz = kcp.PeekSize())
             {
@@ -91,7 +111,8 @@ namespace Server
                 if (kcp.Recv(b) > 0)
                 {
                     // 将消息分发
-                    dispatcher.OnMessageReceived(this, b, 0, sz);
+                    // dispatcher.OnMessageReceived(this, b, 0, sz);
+                    OnMessageReceived?.Invoke(this, b);
                 }
             }
         }
@@ -100,6 +121,8 @@ namespace Server
         // TODO: 调用频繁，每个连接一个
         private void update(UInt32 currentMs)
         {
+            checkReceiveKcpMessage();
+
             if (currentMs >= nextUpdateTimeMs ||
                 needUpdateFlag)
             {

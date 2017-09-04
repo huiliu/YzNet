@@ -7,10 +7,16 @@ using System.Threading.Tasks;
 
 namespace Server
 {
+    // TCP服务器，侦听网络商品，接受新进入的连接
     // TODO:
-    // 1. 连接数限制
-    public class TcpServer : Server<TcpClient>
+    //  1. 连接数限制
+    public class TcpServer
     {
+        // 服务关闭
+        public event Action             OnServerClose;
+
+        // 处理新进入的连接
+        // 在Accept线程中执行，如果有耗时操作应该放到其它线程
         public event Action<TcpClient>  OnNewConnection;
 
         public TcpServer()
@@ -43,7 +49,7 @@ namespace Server
             }
 
             // 在一个单独的线程中接收连接
-            Task.Factory.StartNew(async () =>
+            Task.Run(async () =>
             {
                 await startAccept();
             });
@@ -53,15 +59,19 @@ namespace Server
         {
             state = ServerState.Closed;
             listener.Stop();
+
+            OnServerClose?.Invoke();
         }
 
+        // 接受新来的网络连接
         private async Task startAccept()
         {
+            Debug.Assert(state == ServerState.Start, "服务器没有启动！");
+
             while (state != ServerState.Closed)
             {
                 try
                 {
-                    // 如何关闭？
                     var client = await listener.AcceptTcpClientAsync();
                     handleNewConnection(client);
                 }

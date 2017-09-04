@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -8,12 +9,26 @@ namespace TestUdpServer
 {
     using Server;
     using Server.Message;
-    using MsgPack.Serialization;
+    using MessagePack;
 
     class Program
     {
+        static Dictionary<UInt32, UdpSession> sessions = new Dictionary<uint, UdpSession>();
         static void Main(string[] args)
         {
+            {
+                var ms = new MemoryStream();
+                var buff = MsgUdpKey.Pack(1);
+                ms.Write(buff, 0, buff.Length);
+
+                ms.Position = 0;
+                MsgUdpKey.UnPack(ms.GetBuffer());
+            }
+            {
+                var buff = MessagePack.MessagePackSerializer.Serialize(new MsgPing(1));
+                var m = MessagePack.MessagePackSerializer.Deserialize<MsgPing>(buff);
+            }
+
             ServerConfig cfg = new ServerConfig();
             cfg.IP = "127.0.0.1";
             cfg.Port = 1234;
@@ -36,10 +51,29 @@ namespace TestUdpServer
 
             UInt32 conv = 0;
             KCP.ikcp_decode32u(data, 0, ref conv);
-            Console.WriteLine("Conv: {0}", conv);
 
-            var client = new UdpSession(conv, remoteEndPoint, arg2);
-            client.SetMessageDispatcher(UnAuthorizedDispatcher.Instance);
+            if (sessions.ContainsKey(conv))
+            {
+                var session = sessions[conv];
+                session.OnReceiveMessage(arg1.Buffer);
+            }
+            else
+            {
+                Console.WriteLine("new client Conv: {0}", conv);
+
+                var client = new UdpSession(conv, remoteEndPoint, arg2);
+                client.OnMessageReceived += handleUdpOnMessageReceived;
+                client.Start();
+                sessions.Add(conv, client);
+            }
+
+        }
+
+        private static void handleUdpOnMessageReceived(UdpSession arg1, byte[] arg2)
+        {
+            var m = MessagePackSerializer.Deserialize<MsgDelayTest>(arg2);
+            m.ServerReceiveTime = Utils.IClock();
+            arg1.SendMessage(MessagePackSerializer.Serialize(m));
         }
 
         private static void handleTcpOnNewConnection(System.Net.Sockets.TcpClient client)
@@ -56,10 +90,19 @@ namespace TestUdpServer
                 while (true)
                 {
                     byte[] buffer = new byte[1024];
-
-                    var count = await stream.ReadAsync(buffer, 0, 1024);
-                    if (count ==0)
+                    try
                     {
+                        var count = await stream.ReadAsync(buffer, 0, 1024);
+                        if (count ==0)
+                        {
+                            client.Close();
+                            break;
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        client.Close();
+                        Console.Write("Catch Exception: {0}", e.Message);
                         break;
                     }
 

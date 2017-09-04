@@ -21,7 +21,6 @@ namespace Server
         {
             Debug.Assert(stream.CanRead, "Socket没有连接！", "Session");
 
-            sendFlag = false;
             state  = SessionState.Start;
 
             // 开始接收消息
@@ -54,16 +53,16 @@ namespace Server
             try
             {
                 count = await stream.ReadAsync(buffer, 0, bufferSize);
+
+            if (count == 0)
+            {
+                Close();
+                return;
+            }
             }
             catch (Exception e)
             {
                 Debug.WriteLine("ReadAsync Failed!\nMessage: {0}\nStackTrace: {1}", e.Message, e.StackTrace);
-                Close();
-                return;
-            }
-
-            if (count == 0)
-            {
                 Close();
                 return;
             }
@@ -100,12 +99,6 @@ namespace Server
 
                 return;
             }
-
-            // 检查发送队列
-            if (sendBuffer.Available > 0)
-            {
-
-            }
         }
 
         public uint GetId()
@@ -117,8 +110,6 @@ namespace Server
         private TcpClient           client;
         private NetworkStream       stream;
         private SessionState        state;
-        private bool                sendFlag;
         private MessageDispatcher   dispatcher;
-        private RingBuffer          sendBuffer;
     }
 }
