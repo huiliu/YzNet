@@ -29,11 +29,15 @@ namespace Server
             {
                 try
                 {
+                    if (state == SessionState.Closed)
+                    {
+                        return;
+                    }
+
                     // 将KCP中消息通过UDP Server发送给目标
                     byte[] b = new byte[sz];
                     Buffer.BlockCopy(buff, 0, b, 0, sz);
                     await server.SendMessage(b, remoteEndPoint);
-
                 }
                 catch (Exception e)
                 {
@@ -74,24 +78,18 @@ namespace Server
         }
 
         // 设置消息分发器
-        public void SetMessageDispatcher(MessageDispatcher dispatcher)
+        public void SetMessageDispatcher(IMessageDispatcher dispatcher)
         {
             this.dispatcher = dispatcher;
         }
 
         // 发送网络消息
-        public async Task SendMessage(byte[] buffer)
+        public void SendMessage(byte[] buffer)
         {
             // 将消息交给KCP
             int ret = kcp.Send(buffer);
             Debug.Assert(ret == 0, "Send Data to KCP Failed!", "UDP");
             needUpdateFlag = true;
-        }
-
-        // 发送网络消息
-        public Task SendMessage(byte[] buffer, int offset, int count)
-        {
-            throw new NotImplementedException();
         }
 
         // "处理"收到的网络消息
@@ -122,7 +120,7 @@ namespace Server
                 if (kcp.Recv(b) > 0)
                 {
                     // 将消息分发
-                    dispatcher.OnMessageReceived(this, b, 0, sz);
+                    dispatcher.OnMessageReceived(this, b);
                 }
             }
         }
@@ -149,7 +147,7 @@ namespace Server
             return conv;
         }
 
-        private MessageDispatcher dispatcher;
+        private IMessageDispatcher dispatcher;
         private IPEndPoint remoteEndPoint;
         private UdpServer server;
         private SessionState state;

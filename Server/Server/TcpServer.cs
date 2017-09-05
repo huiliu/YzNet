@@ -17,7 +17,7 @@ namespace Server
 
         // 处理新进入的连接
         // 在Accept线程中执行，如果有耗时操作应该放到其它线程
-        public event Action<TcpClient>  OnNewConnection;
+        public event Action<Socket>  OnNewConnection;
 
         public TcpServer()
         {
@@ -74,7 +74,7 @@ namespace Server
             {
                 try
                 {
-                    var client = await listener.AcceptTcpClientAsync();
+                    var client = await listener.AcceptSocketAsync();
                     handleNewConnection(client);
                 }
                 catch (Exception e)
@@ -86,9 +86,9 @@ namespace Server
             }
         }
 
-        private void handleNewConnection(TcpClient client)
+        private void handleNewConnection(Socket socket)
         {
-            OnNewConnection?.Invoke(client);
+            OnNewConnection?.Invoke(socket);
         }
 
         public Task SendMessage(byte[] buff, object obj = null)

@@ -62,6 +62,7 @@
     <Compile Include="Buffer\RingBuffer.cs" />
     <Compile Include="Client\AsyncTcpClient.cs" />
     <Compile Include="Client\AsyncUdpClient.cs" />
+    <Compile Include="Common\MessageHeader.cs" />
     <Compile Include="Dispatcher\CommandDispatcher.cs" />
     <Compile Include="Dispatcher\UDPMessageDispatcher.cs" />
     <Compile Include="Kcp\kcp.cs" />

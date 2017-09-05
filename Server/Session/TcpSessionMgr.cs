@@ -26,10 +26,10 @@ namespace Server
             sessionDict.Clear();
         }
 
-        public void HandleNewSession(TcpClient client)
+        public void HandleNewSession(Socket socket)
         {
             var newId = getSessionId();
-            Session newSession = new TcpSession(newId, client);
+            Session newSession = new TcpSession(newId, socket);
             sessionDict.TryAdd(newId, newSession);
 
             newSession.SetMessageDispatcher(UnAuthorizedDispatcher.Instance);

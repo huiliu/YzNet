@@ -7,7 +7,7 @@ using Server.Message;
 
 namespace Server
 {
-    public class UDPMessageDispatcher : MessageDispatcher
+    public class UDPMessageDispatcher : IMessageDispatcher
     {
         public static UDPMessageDispatcher Instance = new UDPMessageDispatcher();
         private UDPMessageDispatcher() { }
@@ -38,18 +38,18 @@ namespace Server
             }
         }
 
-        public Task OnDisconnected(Session session)
+        public override void OnDisconnected(Session session)
         {
             throw new NotImplementedException();
         }
 
-        public async Task OnMessageReceived(Session session, byte[] data, int offset, int count)
+        public override void OnMessageReceived(Session session, byte[] data)
         {
             // TODO: 测试代码
             var m = MessagePackSerializer.Deserialize<MsgDelayTest>(data);
             m.ServerReceiveTime = Utils.IClock();
 
-            await session.SendMessage(MessagePackSerializer.Serialize(m));
+            session.SendMessage(MessagePackSerializer.Serialize(m));
         }
     }
 }

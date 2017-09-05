@@ -23,10 +23,9 @@ namespace Server
         uint GetId();
 
         // 设置消息分发器
-        void SetMessageDispatcher(MessageDispatcher dispatcher);
+        void SetMessageDispatcher(IMessageDispatcher dispatcher);
 
         // 向对端发送buffer
-        Task SendMessage(byte[] buffer);
-        Task SendMessage(byte[] buffer, int offset, int count);
+        void SendMessage(byte[] buffer);
     }
 }

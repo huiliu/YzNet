@@ -13,9 +13,9 @@ namespace Server
     // 2. 协商加密方法
     // ...
     // 通过认证后把sesstion的MessageDispatcher设置为其它
-    public class UnAuthorizedDispatcher : MessageDispatcher
+    public class UnAuthorizedDispatcher : IMessageDispatcher
     {
-        public static MessageDispatcher Instance = new UnAuthorizedDispatcher();
+        public static IMessageDispatcher Instance = new UnAuthorizedDispatcher();
         private UnAuthorizedDispatcher() { }
 
         public void Start()
@@ -28,18 +28,18 @@ namespace Server
             throw new NotImplementedException();
         }
 
-        public Task OnDisconnected(Session session)
+        public override void OnDisconnected(Session session)
         {
             throw new NotImplementedException();
         }
 
-        public async Task OnMessageReceived(Session session, byte[] data, int offset, int count)
+        public override void OnMessageReceived(Session session, byte[] data)
         {
             //byte[] b = new byte[count];
             //Array.Copy(data, b, count);
             //Console.WriteLine("收到消息：{0}", Encoding.UTF8.GetString(b));
             Console.Write(session.GetId());
-            await session.SendMessage(data, offset, count);
+            session.SendMessage(data);
         }
 
         public void OnUdpMessageReceived(UdpReceiveResult result, UdpServer server)

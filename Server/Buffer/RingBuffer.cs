@@ -322,6 +322,31 @@ namespace Server
             }
         }
 
+        // 拷贝cnt个字节，但不移动游标
+        public byte[] PeekBytes(int cnt)
+        {
+            lock (this)
+            {
+                if (available < cnt)
+                    throw new Exception("RingBuffer reading overflow");
+
+                byte[] dst = new byte[cnt];
+                if (rPos + cnt > data.Length)
+                {
+                    int len1 = data.Length - rPos;
+                    int len2 = cnt - len1;
+                    Array.Copy(data, rPos, dst, 0, len1);
+                    Array.Copy(data, 0, dst, len1, len2);
+                }
+                else
+                    Array.Copy(data, rPos, dst, 0, cnt);
+
+                //Skip(cnt);
+
+                return dst;
+            }
+        }
+
         public byte ReadByte()
         {
             lock (this)

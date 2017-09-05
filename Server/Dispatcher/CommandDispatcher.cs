@@ -7,9 +7,9 @@ using System.Threading.Tasks;
 
 namespace Server
 {
-    public class CommandDispatcher : MessageDispatcher, IDisposable
+    public class CommandDispatcher : IMessageDispatcher, IDisposable
     {
-        public static MessageDispatcher Instance = new CommandDispatcher();
+        public static IMessageDispatcher Instance = new CommandDispatcher();
         private CommandDispatcher()
         {
             stopFlag = false;
@@ -45,12 +45,12 @@ namespace Server
             throw new NotImplementedException();
         }
 
-        public Task OnDisconnected(Session session)
+        public override void OnDisconnected(Session session)
         {
             throw new NotImplementedException();
         }
 
-        public Task OnMessageReceived(Session session, byte[] data, int offset, int count)
+        public override void OnMessageReceived(Session session, byte[] data)
         {
             throw new NotImplementedException();
         }
