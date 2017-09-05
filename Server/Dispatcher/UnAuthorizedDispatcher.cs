@@ -33,12 +33,13 @@ namespace Server
             throw new NotImplementedException();
         }
 
-        public Task OnMessageReceived(Session session, byte[] data, int offset, int count)
+        public async Task OnMessageReceived(Session session, byte[] data, int offset, int count)
         {
-            byte[] b = new byte[count];
-            Array.Copy(data, b, count);
-            Console.WriteLine("收到消息：{0}", Encoding.UTF8.GetString(b));
-            return Task.Run(() => { });
+            //byte[] b = new byte[count];
+            //Array.Copy(data, b, count);
+            //Console.WriteLine("收到消息：{0}", Encoding.UTF8.GetString(b));
+            Console.Write(session.GetId());
+            await session.SendMessage(data, offset, count);
         }
 
         public void OnUdpMessageReceived(UdpReceiveResult result, UdpServer server)

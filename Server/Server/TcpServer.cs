@@ -48,6 +48,8 @@ namespace Server
                 return;
             }
 
+            Console.WriteLine("服务启动成功！开始接受连接");
+
             // 在一个单独的线程中接收连接
             Task.Run(async () =>
             {

@@ -38,11 +38,15 @@ namespace Server
             {
                 await client.ConnectAsync(IPAddress.Parse(cfg.IP), cfg.Port);
                 Debug.Assert(client.Client.Connected, string.Format("连接{0}/{1}失败！", cfg.IP, cfg.Port), "TcpClient");
+
+                client.Client.SendBufferSize    = 1;
+                client.Client.ReceiveBufferSize = 1;
+
                 stream = client.GetStream();
 
                 OnConnected?.Invoke(this);
 
-                await Task.Run(async () =>
+                Task.Run(async () =>
                 {
                     while (true)
                     {
@@ -71,7 +75,7 @@ namespace Server
         }
 
         // 接收网络消息
-        public async Task receiveMessage()
+        private async Task receiveMessage()
         {
             const int receiveBufferSize = 1024;
             try

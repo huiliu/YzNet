@@ -19,6 +19,8 @@ namespace Server
             this.cfg = cfg;
             this.conv = conv;
             this.client = new UdpClient();
+            client.Client.SendBufferSize = 1;
+            client.Client.ReceiveBufferSize = 1;
             this.kcp = new KCP(conv, async (buff, sz) =>
             {
                 try

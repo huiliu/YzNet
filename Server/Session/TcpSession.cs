@@ -14,9 +14,10 @@ namespace Server
     {
         public TcpSession(uint id, TcpClient client)
         {
-            this.id = id;
-            this.client = client;
-            this.stream = client.GetStream();
+            this.id       = id;
+            this.client   = client;
+
+            stream        = client.GetStream();
         }
 
         // 启动会话
@@ -24,6 +25,10 @@ namespace Server
         public void Start()
         {
             Debug.Assert(stream.CanRead, "Socket没有连接！", "Session");
+
+            client.Client.NoDelay = true;
+            client.Client.SendBufferSize    = 1;
+            client.Client.ReceiveBufferSize = 1;
 
             state  = SessionState.Start;
 
@@ -70,8 +75,7 @@ namespace Server
             }
             catch (Exception e)
             {
-                Debug.WriteLine("ReadAsync Failed!\nMessage: {0}\nStackTrace: {1}", e.Message, e.StackTrace);
-                Close();
+                shouldBeClose(e);
                 return;
             }
 
@@ -96,17 +100,14 @@ namespace Server
         // 非线程安全
         private async Task sendMessageImpl(byte[] buffer, int offset, int count)
         {
-            Debug.Assert(state == SessionState.Start, "会话没有启动！", this.ToString());
             // TODO: 线程安全问题
             try
             {
-                await stream.WriteAsync(buffer, offset, count).ConfigureAwait(false);
+                await stream.WriteAsync(buffer, offset, count);
             }
             catch(Exception e)
             {
-                Debug.WriteLine("ReadAsync Failed!\nMessage: {0}\nStackTrace: {1}", e.Message, e.StackTrace);
-                Close();
-
+                shouldBeClose(e);
                 return;
             }
         }
@@ -116,6 +117,11 @@ namespace Server
             return id;
         }
 
+        private void shouldBeClose(Exception e)
+        {
+            Console.WriteLine("[Id: {2}]捕捉到异常!\nMessage: {0}\nStackTrace: {1}", e.Message, e.StackTrace, GetId());
+            Close();
+        }
         private uint                id;
         private TcpClient           client;
         private NetworkStream       stream;

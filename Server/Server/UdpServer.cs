@@ -42,6 +42,10 @@ namespace Server
 
             // 侦听Udp端口
             lisener = new UdpClient(new IPEndPoint(IPAddress.Parse(cfg.IP), cfg.Port));
+
+            lisener.Client.SendBufferSize    = 1;
+            lisener.Client.ReceiveBufferSize = 1;
+
             state = ServerState.Start;
 
             // 开始收取网络数据
