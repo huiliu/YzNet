@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Net;
@@ -18,8 +19,12 @@ namespace Server
 
         public UdpServer()
         {
-            this.cfg   = null;
-            this.state = ServerState.Closed;
+            cfg = null;
+            state = ServerState.Closed;
+            isSending = false;
+            toBeSendingQueue = new Queue<DatagramPacket>();
+            sendSAEA = new SocketAsyncEventArgs();
+            sendSAEA.Completed += SendCompleted;
         }
 
         public void Dispose()
@@ -88,15 +93,103 @@ namespace Server
         {
             if (remoteEndPoint is IPEndPoint)
             {
-                try
+                lock(toBeSendingQueue)
                 {
-                    int count = await lisener.SendAsync(buff, buff.Length, remoteEndPoint as IPEndPoint);
-                    Debug.Assert(count == buff.Length, "发送数据不完整！", "Server");
+                    if (isSending)
+                    {
+                        toBeSendingQueue.Enqueue(new DatagramPacket() { Content = buff, EndPoint = remoteEndPoint as IPEndPoint });
+                        return;
+                    }
+
+                    isSending = true;
                 }
-                catch (Exception e)
+
+                await sendToSocket(buff, remoteEndPoint as IPEndPoint);
+            }
+        }
+
+        private async Task sendToSocket(byte[] buff, IPEndPoint endPoint)
+        {
+            try
+            {
+                int count = await lisener.SendAsync(buff, buff.Length, endPoint);
+                Debug.Assert(count == buff.Length, "发送数据不完整！", "Server");
+            }
+            catch (Exception e)
+            {
+                shouldBeClose(e);
+            }
+
+            DatagramPacket next = null;
+            lock(toBeSendingQueue)
+            {
+                int cnt = toBeSendingQueue.Count;
+                if (cnt == 0)
                 {
-                    shouldBeClose(e);
+                    isSending = false;
+                    return;
                 }
+
+                next = toBeSendingQueue.Dequeue();
+            }
+
+            await sendToSocket(next.Content, next.EndPoint);
+        }
+
+        private void sendMessageImpl(byte[] buff, IPEndPoint endPoint)
+        {
+            sendSAEA.UserToken = 0;
+            sendSAEA.RemoteEndPoint = endPoint;
+            sendSAEA.SetBuffer(buff, 0, buff.Length);
+
+            sendToSocketEx(sendSAEA);
+        }
+
+        private void sendToSocketEx(SocketAsyncEventArgs e)
+        {
+            try
+            {
+                if (!lisener.Client.SendToAsync(e))
+                {
+                    SendCompleted(null, sendSAEA);
+                }
+            }
+            catch (Exception err)
+            {
+                shouldBeClose(err);
+            }
+        }
+
+        private void SendCompleted(object sender, SocketAsyncEventArgs e)
+        {
+            if (e.SocketError != SocketError.Success)
+            {
+                shouldBeClose(new InvalidOperationException());
+                return;
+            }
+
+            if (e.Buffer.Length != e.Offset)
+            {
+                // 未完成发送
+                e.SetBuffer(e.Buffer, e.Offset, e.Buffer.Length - e.Offset);
+                sendToSocketEx(e);
+            }
+            else
+            {
+                DatagramPacket nextPacket = null;
+                lock(toBeSendingQueue)
+                {
+                    var cnt = toBeSendingQueue.Count;
+                    if (cnt == 0)
+                    {
+                        isSending = false;
+                        return;
+                    }
+
+                    nextPacket = toBeSendingQueue.Dequeue();
+                }
+
+                sendMessageImpl(nextPacket.Content, nextPacket.EndPoint);
             }
         }
 
@@ -114,5 +207,14 @@ namespace Server
         private ServerState     state;
         private ServerConfig    cfg;
         private UdpClient       lisener;
+        private Queue<DatagramPacket> toBeSendingQueue;
+        private bool isSending;
+        private SocketAsyncEventArgs sendSAEA;
+
+        sealed class DatagramPacket
+        {
+            public byte[] Content;
+            public IPEndPoint EndPoint;
+        }
     }
 }

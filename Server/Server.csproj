@@ -59,6 +59,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Buffer\ByteBuffer.cs" />
     <Compile Include="Buffer\RingBuffer.cs" />
     <Compile Include="Client\AsyncTcpClient.cs" />
     <Compile Include="Client\AsyncUdpClient.cs" />

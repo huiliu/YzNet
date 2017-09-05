@@ -18,13 +18,10 @@ namespace Server
             this.id       = id;
             this.socket   = socket;
             stream        = new NetworkStream(socket);
-            receiveBuffer = new RingBuffer();
-            receiveSAEA   = new SocketAsyncEventArgs();
             sendSAEA      = new SocketAsyncEventArgs();
             isSending     = false;
             toBeSendQueue = new Queue<ArraySegment<byte>>();
 
-            receiveSAEA.Completed += receiveSAEACompleted;
             sendSAEA.Completed    += SendSAEACompleted;
         }
 
@@ -43,11 +40,8 @@ namespace Server
             // 在一个独立的线程开始接收消息
             Task.Run(async () =>
             {
-                const int bufferSize = 1024;
-                byte[] receiveBuffer = new byte[bufferSize];
-
-                while(state != SessionState.Closed)
-                    await startReceive(receiveBuffer);
+                while (state != SessionState.Closed)
+                    await startReceive();
             });
         }
 
@@ -68,29 +62,28 @@ namespace Server
         }
 
         #region 接收网络消息
+        ByteBuffer receiveBuffer = new ByteBuffer();
         // 开始接收网络消息
-        private async Task startReceive(byte[] buff)
+        private async Task startReceive()
         {
             int receivedSize = 0;
-
             try
             {
                 // 读取网络消息
-                receivedSize = await stream.ReadAsync(buff, 0, 1024);
+                receivedSize = await stream.ReadAsync(receiveBuffer.Buffer, receiveBuffer.WriteIndex, receiveBuffer.WriteableBytes);
                 if (receivedSize == 0)
                 {
                     Close();
                     return;
                 }
-
-                // 写入到Buffer
-                receiveBuffer.Write(buff, 0, receivedSize);
             }
             catch (Exception e)
             {
                 shouldBeClose(e);
                 return;
             }
+
+            receiveBuffer.MoveWriteIndex(receivedSize);
 
             // 分发消息
             byte[] message = null;
@@ -100,18 +93,54 @@ namespace Server
                 dispatcher.OnMessageReceived(this, message);
             }
         }
-
-        private void startReceive()
-        {
-        }
-
-        private void receiveSAEACompleted(object sender, SocketAsyncEventArgs e)
-        {
-            throw new NotImplementedException();
-        }
         #endregion
 
         #region 发送网络消息
+
+        ByteBuffer toBeSending = new ByteBuffer();
+        public void SendMessageEx(byte[] data)
+        {
+            lock(toBeSending)
+            {
+                if (isSending)
+                {
+                    toBeSending.WriteBytes(data);
+                    return;
+                }
+
+                isSending = true;
+            }
+
+            sendToSocket(data);
+        }
+
+        private async void sendToSocket(byte[] data)
+        {
+            try
+            {
+                await stream.WriteAsync(data, 0, data.Length);
+            }
+            catch (Exception e)
+            {
+                shouldBeClose(e);
+                return;
+            }
+
+            byte[] buff = null;
+            lock(toBeSending)
+            {
+                if (toBeSending.ReadableBytes == 0)
+                {
+                    isSending = false;
+                    return;
+                }
+
+                buff = toBeSending.ReadAll();
+            }
+
+            sendToSocket(buff);
+        }
+
         // 发送Buffer
         public void SendMessage(byte[] data)
         {
@@ -368,10 +397,5 @@ namespace Server
         private SocketAsyncEventArgs        sendSAEA;
         private bool                        isSending;
         private Queue<ArraySegment<byte>>   toBeSendQueue;
-
-        private SocketAsyncEventArgs receiveSAEA;
-        private RingBuffer receiveBuffer;
-
-
     }
 }

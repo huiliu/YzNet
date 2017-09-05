@@ -52,9 +52,9 @@ namespace Server
         }
 
         // 尝试剥除消息头，返回消息内容
-        public static byte[] TryDecode(RingBuffer buff)
+        public static byte[] TryDecode(ByteBuffer buff)
         {
-            var totalLength = buff.Available;
+            var totalLength = buff.ReadableBytes;
             if (totalLength < HeaderLength)
             {
                 // 消息不完整
@@ -67,7 +67,7 @@ namespace Server
             {
                 // TODO: 打印内容
                 Debug.Assert(false, string.Format("同步码错误! {0}", head), "MessageHeader");
-                buff.Skip(2);
+                buff.Retrieve(2);
                 return null;
             }
 
@@ -80,7 +80,7 @@ namespace Server
             }
 
             // 跳过消息头
-            buff.Skip(HeaderLength);
+            buff.Retrieve(HeaderLength);
 
             // 读取消息内容
             return buff.ReadBytes(bodyLength);
