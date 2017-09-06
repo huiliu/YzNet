@@ -89,7 +89,7 @@ namespace Server
         }
 
         // 发送消息至remoteEndPoint
-        public async Task SendMessage(byte[] buff, object remoteEndPoint = null)
+        public void SendMessage(byte[] buff, object remoteEndPoint = null)
         {
             if (remoteEndPoint is IPEndPoint)
             {
@@ -97,6 +97,7 @@ namespace Server
                 {
                     if (isSending)
                     {
+                        // TODO: 优化
                         toBeSendingQueue.Enqueue(new DatagramPacket() { Content = buff, EndPoint = remoteEndPoint as IPEndPoint });
                         return;
                     }
@@ -104,36 +105,8 @@ namespace Server
                     isSending = true;
                 }
 
-                await sendToSocket(buff, remoteEndPoint as IPEndPoint);
+                sendMessageImpl(buff, remoteEndPoint as IPEndPoint);
             }
-        }
-
-        private async Task sendToSocket(byte[] buff, IPEndPoint endPoint)
-        {
-            try
-            {
-                int count = await lisener.SendAsync(buff, buff.Length, endPoint);
-                Debug.Assert(count == buff.Length, "发送数据不完整！", "Server");
-            }
-            catch (Exception e)
-            {
-                shouldBeClose(e);
-            }
-
-            DatagramPacket next = null;
-            lock(toBeSendingQueue)
-            {
-                int cnt = toBeSendingQueue.Count;
-                if (cnt == 0)
-                {
-                    isSending = false;
-                    return;
-                }
-
-                next = toBeSendingQueue.Dequeue();
-            }
-
-            await sendToSocket(next.Content, next.EndPoint);
         }
 
         private void sendMessageImpl(byte[] buff, IPEndPoint endPoint)
@@ -168,10 +141,10 @@ namespace Server
                 return;
             }
 
-            if (e.Buffer.Length != e.Offset)
+            if (e.Buffer.Length != e.BytesTransferred)
             {
                 // 未完成发送
-                e.SetBuffer(e.Buffer, e.Offset, e.Buffer.Length - e.Offset);
+                e.SetBuffer(e.Buffer, e.Offset, e.Buffer.Length - e.BytesTransferred);
                 sendToSocketEx(e);
             }
             else

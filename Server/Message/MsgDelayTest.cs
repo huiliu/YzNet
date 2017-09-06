@@ -18,7 +18,7 @@ namespace Server.Message
             ServerReceiveTime = 0;
             ServerSendTime = 0;
 
-            var temp = new string('x', 1024 * 8);
+            var temp = new string('x', 512);
             Buffer = Encoding.UTF8.GetBytes(temp);
         }
 
@@ -26,7 +26,7 @@ namespace Server.Message
         public UInt32 ClientReceiveTime { get; set; }
         public UInt32 ServerSendTime    { get; set; }
         public UInt32 ServerReceiveTime { get; set; }
-        public byte[] Buffer            { get; private set; }
+        public byte[] Buffer { get; private set; }
 
         public override string ToString()
         {
@@ -35,7 +35,7 @@ namespace Server.Message
                 ClientReceiveTime,
                 ServerSendTime,
                 ServerReceiveTime,
-                Encoding.UTF8.GetString(Buffer));
+                Buffer.Length);
         }
     }
 }

@@ -87,6 +87,12 @@ namespace Server
             client.Close();
         }
 
+        public uint GetID()
+        {
+            return conv;
+        }
+
+        #region 接收消息
         // 接收网络消息
         private async Task receiveMessage()
         {
@@ -112,7 +118,7 @@ namespace Server
             checkKcpReceiveMessage();
         }
 
-        internal void checkKcpReceiveMessage()
+        private void checkKcpReceiveMessage()
         {
             // 读取KCP中的消息
             for (var sz = kcp.PeekSize(); sz > 0; sz = kcp.PeekSize())
@@ -125,7 +131,9 @@ namespace Server
                 }
             }
         }
+        #endregion
 
+        #region 发送消息
         // 发送消息
         public void SendMessage(byte[] buff)
         {
@@ -138,6 +146,7 @@ namespace Server
         {
             throw new NotImplementedException();
         }
+        #endregion
 
         private void shouldBeClose(Exception e)
         {
@@ -164,9 +173,11 @@ namespace Server
         private UdpClient client;
         private bool isClosed;
 
-        private uint conv = 1;
+        #region KCP相关
+        private uint conv;
         private KCP  kcp;
         private bool needUpdateFlag;
         private UInt32 nextUpdateTimeMs;
+        #endregion
     }
 }

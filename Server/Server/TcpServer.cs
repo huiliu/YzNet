@@ -13,7 +13,7 @@ namespace Server
     public class TcpServer
     {
         // 服务关闭
-        public event Action             OnServerClose;
+        public event Action          OnServerClose;
 
         // 处理新进入的连接
         // 在Accept线程中执行，如果有耗时操作应该放到其它线程

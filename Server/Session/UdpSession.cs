@@ -30,7 +30,7 @@ namespace Server
             this.needUpdateFlag   = false;
             this.nextUpdateTimeMs = Utils.IClock();
 
-            kcp = new KCP(conv, async (buff, sz) =>
+            kcp = new KCP(conv, (buff, sz) =>
             {
                 try
                 {
@@ -42,7 +42,7 @@ namespace Server
                     // 将KCP中消息通过UDP Server发送给目标
                     byte[] b = new byte[sz];
                     Buffer.BlockCopy(buff, 0, b, 0, sz);
-                    await server.SendMessage(b, remoteEndPoint);
+                    server.SendMessage(b, remoteEndPoint);
                 }
                 catch (Exception e)
                 {
