@@ -15,12 +15,17 @@ namespace Server
     // TODO: 只用一个uint32数来识别客户端，可能不安全
     public class UdpSession : Session, IDisposable
     {
+        public static UdpSession Create(uint conv, IPEndPoint clientEndPoint, UdpServer server)
+        {
+            var session = new UdpSession(conv, clientEndPoint, server);
+            return session;
+        }
+
         public UdpSession(uint conv, IPEndPoint clientEndPoint, UdpServer server)
         {
             this.conv = conv;
             this.remoteEndPoint = clientEndPoint;
             this.server = server;
-            this.state = SessionState.Closed;
 
             this.needUpdateFlag   = false;
             this.nextUpdateTimeMs = Utils.IClock();
@@ -29,7 +34,7 @@ namespace Server
             {
                 try
                 {
-                    if (state == SessionState.Closed)
+                    if (!IsConnected)
                     {
                         return;
                     }
@@ -54,37 +59,27 @@ namespace Server
         {
         }
 
-        // 启动UDP会话
-        public void Start()
-        {
-            Debug.Assert(dispatcher != null, "没有设置消息分发器！", this.ToString());
-            state = SessionState.Start;
-
-            Task.Run(async () =>
-            {
-                while (state == SessionState.Start)
-                {
-                    kcpUpdate(Utils.IClock());
-                    await Task.Delay(5);
-                }
-            });
-        }
-
         // 关闭UDP会话
-        public void Close()
+        public override void Close()
         {
-            state = SessionState.Closed;
+            IsConnected = false;
+            CanReceive = false;
+
             dispatcher.OnDisconnected(this);
         }
 
-        // 设置消息分发器
-        public void SetMessageDispatcher(IMessageDispatcher dispatcher)
+        public void Shutdown()
         {
-            this.dispatcher = dispatcher;
+            Close();
+        }
+
+        public override uint GetId()
+        {
+            return conv;
         }
 
         // 发送网络消息
-        public void SendMessage(byte[] buffer)
+        public override void SendMessage(byte[] buffer)
         {
             // 将消息交给KCP
             int ret = kcp.Send(buffer);
@@ -142,15 +137,26 @@ namespace Server
             }
         }
 
-        public uint GetId()
+        // 启动KCP更新
+        private void startUpdate()
         {
-            return conv;
+            Task.Run(async () =>
+            {
+                while (IsConnected)
+                {
+                    kcpUpdate(Utils.IClock());
+                    await Task.Delay(5);
+                }
+            });
         }
 
-        private IMessageDispatcher dispatcher;
+        protected override void startReceive()
+        {
+            startUpdate();
+        }
+
         private IPEndPoint remoteEndPoint;
         private UdpServer server;
-        private SessionState state;
 
         #region KCP相关
         private uint conv;

@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+
+// 参考https://github.com/chenshuo/muduo中Buffer的实现
 
 namespace Server
 {
@@ -17,17 +15,6 @@ namespace Server
 
         public int ReadIndex { get; private set; }
         public int WriteIndex { get; private set; }
-        public void MoveWriteIndex(int len)
-        {
-            WriteIndex += len;
-
-            if (WriteableBytes < 100 && PrependableBytes > 100)
-            {
-                Array.Copy(buffer, ReadIndex, buffer, kCheapPrepend, ReadableBytes);
-                return;
-            }
-        }
-
         public int ReadableBytes { get { return WriteIndex - ReadIndex; } }
         public int WriteableBytes { get { return buffer.Length - WriteIndex; } }
         public int PrependableBytes { get { return ReadIndex; } }
@@ -259,23 +246,29 @@ namespace Server
 
         public void Swap(ByteBuffer rhs)
         {
-            var temp = buffer;
-            buffer = rhs.buffer;
+            var temp   = buffer;
+            buffer     = rhs.buffer;
             rhs.buffer = temp;
 
-            var value = ReadIndex;
-            ReadIndex = rhs.ReadIndex;
+            var value     = ReadIndex;
+            ReadIndex     = rhs.ReadIndex;
             rhs.ReadIndex = value;
 
-            value = WriteIndex;
-            WriteIndex = rhs.WriteIndex;
+            value         = WriteIndex;
+            WriteIndex    = rhs.WriteIndex;
             rhs.ReadIndex = value;
         }
 
         public void Shrink(int reserve)
         {
-            ByteBuffer newBuffer = new ByteBuffer(ReadableBytes + reserve);
-            Swap(newBuffer);
+            var readableBytes = ReadableBytes;
+
+            byte[] newBuffer = new byte[kCheapPrepend + ReadableBytes + reserve];
+            Array.Copy(buffer, ReadIndex, newBuffer, kCheapPrepend, ReadableBytes);
+
+            buffer     = newBuffer;
+            ReadIndex  = kCheapPrepend;
+            WriteIndex = ReadIndex + readableBytes;
         }
 
         #region 头部添加消息头
@@ -312,6 +305,30 @@ namespace Server
         public void PrependInt64(Int64 x)
         {
             Prepend(BitConverter.GetBytes(x));
+        }
+        #endregion
+
+        #region 额外添加
+
+        // 手动移动WriteIndex
+        public void MoveWriteIndex(int len)
+        {
+            WriteIndex += len;
+        }
+
+        // 当尾部数据少于头部时，将数据整体向前移动
+        // 如果一个协议包大于buffer.Length
+        public void TryDefragment()
+        {
+            if (WriteableBytes < PrependableBytes - kCheapPrepend && WriteableBytes < 100)
+            {
+                var readableBytes = ReadableBytes;
+
+                Array.Copy(Buffer, ReadIndex, Buffer, kCheapPrepend, ReadableBytes);
+
+                ReadIndex  = kCheapPrepend;
+                WriteIndex = ReadIndex + readableBytes;
+            }
         }
         #endregion
     }

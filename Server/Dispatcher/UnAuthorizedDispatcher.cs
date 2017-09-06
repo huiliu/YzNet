@@ -18,7 +18,7 @@ namespace Server
         public static IMessageDispatcher Instance = new UnAuthorizedDispatcher();
         private UnAuthorizedDispatcher() { }
 
-        public void Start()
+        public override void Start()
         {
             throw new NotImplementedException();
         }
@@ -30,7 +30,7 @@ namespace Server
 
         public override void OnDisconnected(Session session)
         {
-            throw new NotImplementedException();
+            Console.Write(string.Format("session[{0}]关闭了！", session?.GetId()));
         }
 
         public override void OnMessageReceived(Session session, byte[] data)
@@ -38,7 +38,7 @@ namespace Server
             //byte[] b = new byte[count];
             //Array.Copy(data, b, count);
             //Console.WriteLine("收到消息：{0}", Encoding.UTF8.GetString(b));
-            Console.Write(session.GetId());
+            //Console.Write(session.GetId());
             session.SendMessage(data);
         }
 

@@ -10,139 +10,132 @@ namespace Server
 {
     // TCP会话
     // 表示一条TCP连接
-    public class TcpSession : Session
+    public class TcpSession : Session, IDisposable
     {
-        private static int MaxPackageSize = 1024 * 8;
-        public TcpSession(uint id, Socket socket)
+        public static TcpSession Create(Socket s)
         {
-            this.id       = id;
-            this.socket   = socket;
-            stream        = new NetworkStream(socket);
-            sendSAEA      = new SocketAsyncEventArgs();
-            isSending     = false;
-            toBeSendQueue = new Queue<ArraySegment<byte>>();
-
-            sendSAEA.Completed    += SendSAEACompleted;
+            var session = new TcpSession(s);
+            return session;
         }
 
-        // 启动会话
-        // 开始接收网络消息
-        public void Start()
+        public TcpSession(Socket socket)
         {
-            Debug.Assert(stream.CanRead, "Socket没有连接！", "Session");
+            this.id       = TcpSessionMgr.Instance.getSessionId();
+            this.socket   = socket;
 
+            // 设置socket参数
             socket.NoDelay           = true;
             socket.SendBufferSize    = 1;
             socket.ReceiveBufferSize = 1;
 
-            state  = SessionState.Start;
+            recvSAEA      = new SocketAsyncEventArgs();
+            recvBuffer = new ByteBuffer(MessageHeader.MessageMaxLength);
 
-            // 在一个独立的线程开始接收消息
-            Task.Run(async () =>
-            {
-                while (state != SessionState.Closed)
-                    await startReceive();
-            });
+            isSending     = false;
+            sendSAEA      = new SocketAsyncEventArgs();
+            toBeSendQueue = new Queue<ArraySegment<byte>>();
+
+            recvSAEA.Completed  += recvSAEACompleted;
+            sendSAEA.Completed  += sendSAEACompleted;
+
+            statistics = new NetStatistics(this);
         }
 
         // 关闭Session
-        public void Close()
+        public override void Close()
         {
-            state = SessionState.Closed;
-            TcpSessionMgr.Instance.HandleSessionClosed(this);
+            statistics.Close();
 
+            CanReceive = false;
+            IsConnected = false;
             socket.Close();
             dispatcher.OnDisconnected(this);
         }
 
-        // 设置网络消息分发器
-        public void SetMessageDispatcher(IMessageDispatcher dispatcher)
+        public void Dispose()
         {
-            this.dispatcher = dispatcher;
+            socket.Dispose();
+            toBeSendQueue.Clear();
+        }
+
+        public override uint GetId()
+        {
+            return id;
+        }
+
+        private void shouldBeClose(Exception e)
+        {
+            Console.WriteLine("[Id: {2}]捕捉到异常!\nMessage: {0}\nStackTrace: {1}", e.Message, e.StackTrace, GetId());
+            Close();
         }
 
         #region 接收网络消息
-        ByteBuffer receiveBuffer = new ByteBuffer();
         // 开始接收网络消息
-        private async Task startReceive()
+        protected override void startReceive()
         {
-            int receivedSize = 0;
+            if (recvBuffer.WriteableBytes == 0)
+            {
+                // 如果经常进入此块，应该初始时即将recvBuffer设置足够大
+                Debug.WriteLine("没有足够的缓冲区接收数据！", this.ToString());
+                recvBuffer.Shrink(1024);
+            }
+
+            recvSAEA.SocketFlags = SocketFlags.None;
+            recvSAEA.SetBuffer(recvBuffer.Buffer, recvBuffer.WriteIndex, recvBuffer.WriteableBytes);
+
             try
             {
-                // 读取网络消息
-                receivedSize = await stream.ReadAsync(receiveBuffer.Buffer, receiveBuffer.WriteIndex, receiveBuffer.WriteableBytes);
-                if (receivedSize == 0)
+                if (!socket.ReceiveAsync(recvSAEA))
                 {
-                    Close();
-                    return;
+                    // 同步完成
+                    recvSAEACompleted(null, recvSAEA);
                 }
             }
             catch (Exception e)
             {
                 shouldBeClose(e);
+            }
+        }
+
+        private void recvSAEACompleted(object sender, SocketAsyncEventArgs e)
+        {
+            if (!IsConnected || !CanReceive)
+            {
+                // Session状态不满足
                 return;
             }
 
-            receiveBuffer.MoveWriteIndex(receivedSize);
-
-            // 分发消息
-            byte[] message = null;
-            while ((message = MessageHeader.TryDecode(receiveBuffer)) != null)
+            if (e.SocketError != SocketError.Success)
             {
-                // 消息应该放入主线程处理
-                dispatcher.OnMessageReceived(this, message);
+                // 发生错误
+                shouldBeClose(new InvalidOperationException());
+                return;
             }
+
+            statistics.TotalRecvBytes += e.BytesTransferred;
+
+            // 移动游标
+            recvBuffer.MoveWriteIndex(e.BytesTransferred);
+
+            // 尝试解析并分发消息
+            byte[] msg = null;
+            while ((msg = MessageHeader.TryDecode(recvBuffer)) != null)
+            {
+                ++statistics.RecvPacketCount;
+                dispatcher.OnMessageReceived(this, msg);
+            }
+
+            // 尝试调整Buffer
+            recvBuffer.TryDefragment();
+
+            // 再次开始接收
+            startReceive();
         }
         #endregion
 
         #region 发送网络消息
-
-        ByteBuffer toBeSending = new ByteBuffer();
-        public void SendMessageEx(byte[] data)
-        {
-            lock(toBeSending)
-            {
-                if (isSending)
-                {
-                    toBeSending.WriteBytes(data);
-                    return;
-                }
-
-                isSending = true;
-            }
-
-            sendToSocket(data);
-        }
-
-        private async void sendToSocket(byte[] data)
-        {
-            try
-            {
-                await stream.WriteAsync(data, 0, data.Length);
-            }
-            catch (Exception e)
-            {
-                shouldBeClose(e);
-                return;
-            }
-
-            byte[] buff = null;
-            lock(toBeSending)
-            {
-                if (toBeSending.ReadableBytes == 0)
-                {
-                    isSending = false;
-                    return;
-                }
-
-                buff = toBeSending.ReadAll();
-            }
-
-            sendToSocket(buff);
-        }
-
         // 发送Buffer
-        public void SendMessage(byte[] data)
+        public override void SendMessage(byte[] data)
         {
             sendMessageImpl(data);
         }
@@ -183,8 +176,10 @@ namespace Server
                 if (!ret)
                 {
                     // 同步完成
-                    SendSAEACompleted(null, sendSAEA);
+                    sendSAEACompleted(null, sendSAEA);
                 }
+
+                ++statistics.SendPacketCount;
             }
             catch (Exception e)
             {
@@ -193,7 +188,7 @@ namespace Server
         }
 
         // SendAsync回调
-        private void SendSAEACompleted(object sender, SocketAsyncEventArgs e)
+        private void sendSAEACompleted(object sender, SocketAsyncEventArgs e)
         {
             SocketError socketError;
             SendingQueue srcQueue;
@@ -201,7 +196,7 @@ namespace Server
             socketError = e.SocketError;
             srcQueue = e.UserToken as SendingQueue;
 
-            if (state != SessionState.Start)
+            if (!IsConnected)
             {
                 return;
             }
@@ -214,6 +209,7 @@ namespace Server
 
             if (srcQueue.Trim(e.BytesTransferred))
             {
+                statistics.TotalSendBytes += e.BytesTransferred;
                 // 全部发送完毕
 
                 ArraySegment<byte>[] arr;
@@ -377,25 +373,16 @@ namespace Server
         }
         #endregion
 
-        public uint GetId()
-        {
-            return id;
-        }
+        private uint    id;
+        private Socket  socket;
 
-        private void shouldBeClose(Exception e)
-        {
-            Console.WriteLine("[Id: {2}]捕捉到异常!\nMessage: {0}\nStackTrace: {1}", e.Message, e.StackTrace, GetId());
-            Close();
-        }
+        ByteBuffer                      recvBuffer;
+        private SocketAsyncEventArgs    recvSAEA;
 
-        private uint                id;
-        private Socket              socket;
-        private NetworkStream       stream;
-        private SessionState        state;
-        private IMessageDispatcher  dispatcher;
-
-        private SocketAsyncEventArgs        sendSAEA;
         private bool                        isSending;
+        private SocketAsyncEventArgs        sendSAEA;
         private Queue<ArraySegment<byte>>   toBeSendQueue;
+
+        private NetStatistics statistics;
     }
 }

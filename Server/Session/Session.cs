@@ -15,17 +15,43 @@ namespace Server
     }
 
     // 表示一个会话，可能是TCP，也可能是UDP
-    public interface Session
+    public abstract class Session
     {
-        void Start();
-        void Close();
+        private bool isConnected;
+        public bool IsConnected
+        {
+            get { return isConnected; }
+            set { isConnected = value; }
+        }
 
-        uint GetId();
+        private bool canReceive;
+        public bool CanReceive
+        {
+            get { return canReceive; }
+            set
+            {
+                canReceive = value;
+                if (IsConnected && canReceive)
+                {
+                    startReceive();
+                }
+            }
+        }
+
+        public abstract void Close();
+
+        public abstract uint GetId();
 
         // 设置消息分发器
-        void SetMessageDispatcher(IMessageDispatcher dispatcher);
+        protected IMessageDispatcher dispatcher;
+        public void SetMessageDispatcher(IMessageDispatcher _dispatcher)
+        {
+            dispatcher = _dispatcher;
+        }
 
         // 向对端发送buffer
-        void SendMessage(byte[] buffer);
+        public abstract void SendMessage(byte[] buffer);
+
+        protected abstract void startReceive();
     }
 }

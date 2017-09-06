@@ -1,5 +1,6 @@
 ﻿using System;
-using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -26,14 +27,40 @@ namespace Server
             sessionDict.Clear();
         }
 
+        public void Register(uint id, TcpSession session)
+        {
+            lock(sessionDict)
+            {
+                if (sessionDict.ContainsKey(id))
+                {
+                    Debug.WriteLine(string.Format("出现相同SessionId[{0}]", id), "TcpSession");
+                    var oldSession = sessionDict[id];
+                    oldSession.Close();
+                }
+
+                sessionDict[id] = session;
+            }
+        }
+
+        public void UnRegister(uint id)
+        {
+            lock (sessionDict)
+            {
+                if (sessionDict.ContainsKey(id))
+                {
+                    sessionDict.Remove(id);
+                }
+            }
+        }
+
         public void HandleNewSession(Socket socket)
         {
-            var newId = getSessionId();
-            Session newSession = new TcpSession(newId, socket);
-            sessionDict.TryAdd(newId, newSession);
+            TcpSession newSession = TcpSession.Create(socket);
+            Register(newSession.GetId(), newSession);
 
             newSession.SetMessageDispatcher(UnAuthorizedDispatcher.Instance);
-            newSession.Start();
+            newSession.IsConnected = true;
+            newSession.CanReceive  = true;
 
             // Test代码
             // 向客户端发送UDP会话标识码
@@ -42,14 +69,21 @@ namespace Server
             newSession.SendMessage(MsgUdpKey.Pack(UdpSessionMgr.Instance.GetFreeConv()));
         }
 
-        public void HandleSessionClosed(Session s)
+        public void HandleSessionClosed(uint id)
         {
-            Session unuse;
-            sessionDict.TryRemove(s.GetId(), out unuse);
+            UnRegister(id);
+        }
+
+        public TcpSession FindSessionById(uint sessionId)
+        {
+            TcpSession session = null;
+            sessionDict.TryGetValue(sessionId, out session);
+
+            return session;
         }
 
         static uint sessionId = 0;
-        private uint getSessionId()
+        public uint getSessionId()
         {
             if (sessionId < uint.MaxValue)
             {
@@ -62,6 +96,6 @@ namespace Server
             }
         }
 
-        private ConcurrentDictionary<uint, Session> sessionDict = new ConcurrentDictionary<uint, Session>();
+        private Dictionary<uint, TcpSession> sessionDict = new Dictionary<uint, TcpSession>();
     }
 }

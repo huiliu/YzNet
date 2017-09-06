@@ -15,7 +15,7 @@ namespace Server
             stopFlag = false;
         }
 
-        public void Start()
+        public override void Start()
         {
             while (!stopFlag)
             {

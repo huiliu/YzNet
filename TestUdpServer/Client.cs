@@ -12,6 +12,6 @@ namespace TestUdpServer
     {
 
         private ClientCfg cfg;
-        private AsyncUdpClient client;
+        private ReliableUdpClient client;
     }
 }

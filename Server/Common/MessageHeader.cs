@@ -19,7 +19,7 @@ namespace Server
 
         // 消息最大长度
         // 64KB - HeaderLength
-        public const UInt16 MessageMaxLength = UInt16.MaxValue - HeaderLength;
+        public const UInt16 MessageMaxLength = 1024 * 16 - HeaderLength;
 
         // 同步码
         public static byte SYN_CODE1 = 83;
@@ -60,6 +60,7 @@ namespace Server
                 // 消息不完整
                 return null;
             }
+
 
             // 验证消息头同步码
             var head = buff.PeekBytes(HeaderLength);

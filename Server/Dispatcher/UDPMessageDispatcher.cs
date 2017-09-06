@@ -12,7 +12,7 @@ namespace Server
         public static UDPMessageDispatcher Instance = new UDPMessageDispatcher();
         private UDPMessageDispatcher() { }
 
-        public void Start()
+        public override void Start()
         {
             throw new NotImplementedException();
         }

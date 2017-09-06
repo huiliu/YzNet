@@ -33,27 +33,46 @@ namespace TestTcpServer
 
             for (var i = 0; i < num; ++i)
             {
-                AsyncTcpClient client = new AsyncTcpClient(cfg);
-                client.OnConnected += handleClientOnConnected;
-                client.OnMessageReceived += handleClientReceiveMessage;
-                await client.Connect();
+                var client = await TcpConnector.ConnectTcpServer(cfg);
+                client.SetMessageDispatcher(TempMessageDispatcher.Instance);
+                client.IsConnected = true;
+                client.CanReceive = true;
+
+                var temp = new string('a', 1024 * 8);
+                client.SendMessage(Encoding.UTF8.GetBytes(temp));
             }
         }
 
-        private static async void handleClientOnConnected(AsyncTcpClient obj)
+    }
+
+    class TempMessageDispatcher : IMessageDispatcher
+    {
+        public static IMessageDispatcher Instance = new TempMessageDispatcher();
+        private TempMessageDispatcher()
         {
-            var temp = new string('a', 1024 * 8);
-            await obj.SendMessage(Encoding.UTF8.GetBytes(temp));
+
         }
 
-        private static async void handleClientReceiveMessage(AsyncTcpClient client, byte[] arg2, int arg3, int arg4)
+        public override void OnDisconnected(Session session)
         {
-            Console.Write("*");
-            RandomClose(client);
-            await client.SendMessage(arg2, arg3, arg4);
+            Console.WriteLine(string.Format("[{0}]连接关闭！", session.GetId()));
         }
 
-        private static void RandomClose(AsyncTcpClient client)
+        private static long total = 0;
+        public override void OnMessageReceived(Session session, byte[] data)
+        {
+            //total += data.Length;
+            //Console.WriteLine(total);
+            // RandomClose(session);
+            session.SendMessage(data);
+        }
+
+        public override void Start()
+        {
+            throw new NotImplementedException();
+        }
+
+        private void RandomClose(Session client)
         {
             if (Utils.IClock() % 91 == 1)
             {

@@ -8,19 +8,21 @@ using System.Threading.Tasks;
 namespace Server
 {
     // 集成KCP功能的UDP客户端
-    public class AsyncUdpClient : IDisposable
+    public class ReliableUdpClient : IDisposable
     {
-        public event Action<AsyncUdpClient>                     OnConnected;        // 连接建立成功回调
-        public event Action<AsyncUdpClient, byte[], int, int>   OnMessageReceived;  // 收到数据回调
-        public event Action<AsyncUdpClient>                     OnDisconnected;     // 连接断开回调
+        public event Action<ReliableUdpClient>                     OnConnected;        // 连接建立成功回调
+        public event Action<ReliableUdpClient, byte[], int, int>   OnMessageReceived;  // 收到数据回调
+        public event Action<ReliableUdpClient>                     OnDisconnected;     // 连接断开回调
 
-        public AsyncUdpClient(ClientCfg cfg, UInt32 conv)
+        public ReliableUdpClient(ClientCfg cfg, UInt32 conv)
         {
             this.cfg = cfg;
             this.conv = conv;
-            this.client = new UdpClient();
+            isClosed = false;
+            client = new UdpClient();
             client.Client.SendBufferSize = 1;
             client.Client.ReceiveBufferSize = 1;
+
             this.kcp = new KCP(conv, async (buff, sz) =>
             {
                 try
@@ -42,7 +44,7 @@ namespace Server
 
             Task.Run(() =>
             {
-                while (true)
+                while (!isClosed)
                 {
                     kcpUpdate(Utils.IClock());
                     Thread.Sleep(5);
@@ -80,6 +82,8 @@ namespace Server
 
         public void Close()
         {
+            isClosed = true;
+            OnDisconnected?.Invoke(this);
             client.Close();
         }
 
@@ -158,6 +162,7 @@ namespace Server
 
         private ClientCfg cfg;
         private UdpClient client;
+        private bool isClosed;
 
         private uint conv = 1;
         private KCP  kcp;

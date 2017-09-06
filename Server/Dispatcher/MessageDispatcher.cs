@@ -10,6 +10,7 @@ namespace Server
     // 消息分发器
     public abstract class IMessageDispatcher
     {
+        public abstract void Start();
         // 处理收到的消息
         public abstract void OnMessageReceived(Session session, byte[] data);
 

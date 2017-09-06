@@ -88,6 +88,7 @@
     <Compile Include="Session\UdpSession.cs" />
     <Compile Include="Dispatcher\UnAuthorizedDispatcher.cs" />
     <Compile Include="Session\UdpSessionMgr.cs" />
+    <Compile Include="Statistics\NetStatistics.cs" />
     <Compile Include="Utilities.cs" />
   </ItemGroup>
   <ItemGroup>
