@@ -21,7 +21,7 @@ namespace TestUdpServer
 
             TcpServer s = new TcpServer();
             //s.OnNewConnection += handleTcpOnNewConnection; 
-            s.OnNewConnection += TcpSessionMgr.Instance.HandleNewSession;
+            s.OnNewConnection += OnNewConnection;
             s.StartServiceOn(cfg);
 
             UdpServer us = new UdpServer();
@@ -29,6 +29,18 @@ namespace TestUdpServer
             us.StartServiceOn(cfg);
 
             CommandDispatcher.Instance.Start();
+        }
+
+        private static void OnNewConnection(System.Net.Sockets.Socket socket)
+        {
+            TcpSession newSession = TcpSession.Create(socket);
+            // Register(newSession.GetId(), newSession);
+
+            newSession.SetMessageDispatcher(UnAuthorizedDispatcher.Instance);
+            newSession.IsConnected = true;
+            newSession.CanReceive  = true;
+
+            newSession.SendMessage(MsgUdpKey.Pack(UdpSessionMgr.Instance.GetFreeConv()));
         }
     }
 }

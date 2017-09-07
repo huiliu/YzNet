@@ -61,12 +61,6 @@ namespace Server
             newSession.SetMessageDispatcher(UnAuthorizedDispatcher.Instance);
             newSession.IsConnected = true;
             newSession.CanReceive  = true;
-
-            // Test代码
-            // 向客户端发送UDP会话标识码
-            // newSession.SendMessage(Encoding.UTF8.GetBytes(UdpSessionMgr.Instance.GetFreeConv().ToString()));
-            var key = MsgUdpKey.Pack(1);
-            newSession.SendMessage(MsgUdpKey.Pack(UdpSessionMgr.Instance.GetFreeConv()));
         }
 
         public void HandleSessionClosed(uint id)

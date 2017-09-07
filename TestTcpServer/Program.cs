@@ -1,10 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 using Server;
+using Server.Message;
+using MessagePack;
+using System.Timers;
 
 namespace TestTcpServer
 {
@@ -14,13 +21,13 @@ namespace TestTcpServer
         {
             ServerConfig cfg = new ServerConfig();
             cfg.IP = "127.0.0.1";
-            cfg.Port = 1234;
+            cfg.Port = 12345;
 
             TcpServer server = new TcpServer();
             server.OnNewConnection += TcpSessionMgr.Instance.HandleNewSession;
             server.StartServiceOn(cfg);
 
-            startClient(10);
+            startClient(1);
 
             CommandDispatcher.Instance.Start();
         }
@@ -29,17 +36,28 @@ namespace TestTcpServer
         {
             ClientCfg cfg = new ClientCfg();
             cfg.IP = "127.0.0.1";
-            cfg.Port = 1234;
+            cfg.Port = 12345;
+
+            TempMessageDispatcher dispatcher = new TempMessageDispatcher();
 
             for (var i = 0; i < num; ++i)
             {
                 var client = await TcpConnector.ConnectTcpServer(cfg);
-                client.SetMessageDispatcher(TempMessageDispatcher.Instance);
+                client.SetMessageDispatcher(dispatcher);
                 client.IsConnected = true;
                 client.CanReceive = true;
 
-                var temp = new string('a', 1024 * 8);
-                client.SendMessage(Encoding.UTF8.GetBytes(temp));
+                dispatcher.rrts.TryAdd(client.GetId(), new List<long>());
+
+                var msg = new MsgDelayTest();
+                msg.ClientSendTime = Utils.IClock();
+                client.SendMessage(MessagePack.MessagePackSerializer.Serialize(msg));
+
+                Task.Run(() =>
+                {
+                    Thread.Sleep(1000 * 60 * 3);
+                    client.Close();
+                });
             }
         }
 
@@ -47,21 +65,49 @@ namespace TestTcpServer
 
     class TempMessageDispatcher : IMessageDispatcher
     {
-        public static IMessageDispatcher Instance = new TempMessageDispatcher();
-        private TempMessageDispatcher()
+        public TempMessageDispatcher()
         {
 
         }
 
         public override void OnDisconnected(Session session)
         {
+            var rrt = rrts[session.GetId()];
+
+            using (var fSteam = new FileStream(string.Format(@"D:\TCP{0}.txt", session.GetId()), FileMode.OpenOrCreate, FileAccess.Write))
+            {
+                StreamWriter sw = new StreamWriter(fSteam);
+
+                rrt.ForEach(v =>
+                {
+                    sw.Write(v);
+                    sw.Write('\n');
+                });
+
+                sw.Flush();
+            }
+
+            Console.WriteLine(string.Format("[{0}]连接关闭！ 收到总包数: {1} RRT: [Min: {2} Max: {3} Avg: {4}]",
+                session.GetId(),
+                rrt.Count,
+                rrt.Min(),
+                rrt.Max(),
+                rrt.Average()));
             Console.WriteLine(string.Format("[{0}]连接关闭！", session.GetId()));
         }
 
         public override void OnMessageReceived(Session session, byte[] data)
         {
-            RandomClose(session);
-            session.SendMessage(data);
+            var msg = MessagePack.MessagePackSerializer.Deserialize<MsgDelayTest>(data);
+
+            var delay = Utils.IClock() - msg.ClientSendTime;
+            rrts[session.GetId()].Add(delay);
+
+            Console.WriteLine("RRT: {0}", delay);
+
+            msg.ClientSendTime = Utils.IClock();
+            var buff = MessagePackSerializer.Serialize(msg);
+            session.SendMessage(buff);
         }
 
         public override void Start()
@@ -69,13 +115,18 @@ namespace TestTcpServer
             throw new NotImplementedException();
         }
 
-        private void RandomClose(Session client)
+        private bool RandomClose(Session client)
         {
             if (Utils.IClock() % 10001 == 1)
             {
                 Console.WriteLine("随机关闭一个客户端");
                 client.Close();
+                return true;
             }
+
+            return false;
         }
+
+        public ConcurrentDictionary<uint, List<long>> rrts = new ConcurrentDictionary<uint, List<long>>();
     }
 }

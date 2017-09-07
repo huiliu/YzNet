@@ -48,8 +48,9 @@ namespace Server
             // 侦听Udp端口
             lisener = new UdpClient(new IPEndPoint(IPAddress.Parse(cfg.IP), cfg.Port));
 
-            lisener.Client.SendBufferSize    = 1;
-            lisener.Client.ReceiveBufferSize = 1;
+            lisener.Client.Blocking = false;
+            lisener.Client.SendBufferSize    = 1024 * 32;
+            lisener.Client.ReceiveBufferSize = 1024 * 32;
 
             state = ServerState.Start;
 
@@ -112,9 +113,12 @@ namespace Server
         private void sendMessageImpl(byte[] buff, IPEndPoint endPoint)
         {
             sendSAEA.UserToken = 0;
+            sendSAEA.SocketError = SocketError.Success;
+            sendSAEA.SocketFlags = SocketFlags.None;
             sendSAEA.RemoteEndPoint = endPoint;
             sendSAEA.SetBuffer(buff, 0, buff.Length);
 
+            Console.WriteLine("remoteEndPoint: {0}", endPoint);
             sendToSocketEx(sendSAEA);
         }
 
@@ -137,7 +141,9 @@ namespace Server
         {
             if (e.SocketError != SocketError.Success)
             {
-                shouldBeClose(new InvalidOperationException());
+                Console.WriteLine("ERROR remoteEndPoint: {0}", e.RemoteEndPoint);
+                isSending = false;
+                shouldBeClose(e.SocketError);
                 return;
             }
 
@@ -175,6 +181,11 @@ namespace Server
         {
             Console.WriteLine("捕捉到异常：{0}\nStackTrace: {1}", e.Message, e.StackTrace);
             Stop();
+        }
+
+        private void shouldBeClose(SocketError errCode)
+        {
+            Console.WriteLine("发送了错误！ErroCode: {0}", errCode);
         }
 
         private ServerState     state;

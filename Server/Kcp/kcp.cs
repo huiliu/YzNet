@@ -1,11 +1,13 @@
 ﻿using System;
 
+// 根据讨论https://github.com/skywind3000/kcp/issues/10将flush接口调整为public，以便于每次发送后调用
+
 namespace Server
 {
 public class KCP
 {
-    public const int IKCP_RTO_NDL     = 10;  // no delay min rto
-    public const int IKCP_RTO_MIN     = 100; // normal min rto
+    public const int IKCP_RTO_NDL     = 30;  // no delay min rto
+    public const int IKCP_RTO_MIN     = 10;  // normal min rto
     public const int IKCP_RTO_DEF     = 200;
     public const int IKCP_RTO_MAX     = 60000;
     public const int IKCP_CMD_PUSH    = 81; // cmd: push data
@@ -577,7 +579,7 @@ public class KCP
     }
 
     // flush pending data
-    void flush() { 
+    public void Flush() { 
         var current_ = current;
         var buffer_ = buffer;
         var change = 0;
@@ -790,7 +792,7 @@ public class KCP
             ts_flush += interval;
             if (_itimediff(current, ts_flush) >= 0)
                 ts_flush = current + interval;
-            flush();
+            Flush();
         }
     }
 

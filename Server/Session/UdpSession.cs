@@ -15,6 +15,10 @@ namespace Server
     // TODO: 只用一个uint32数来识别客户端，可能不安全
     public class UdpSession : Session, IDisposable
     {
+        // KCP相关参数
+        private static int kSendWnd = 128;  // 发送窗口
+        private static int kRecvWnd = 128;  // 接收窗口
+
         public static UdpSession Create(uint conv, IPEndPoint clientEndPoint, UdpServer server)
         {
             var session = new UdpSession(conv, clientEndPoint, server);
@@ -27,7 +31,6 @@ namespace Server
             this.remoteEndPoint = clientEndPoint;
             this.server = server;
 
-            this.needUpdateFlag   = false;
             this.nextUpdateTimeMs = Utils.IClock();
 
             kcp = new KCP(conv, (buff, sz) =>
@@ -54,7 +57,9 @@ namespace Server
             lock(kcp)
             {
                 kcp.NoDelay(1, 10, 2, 1);
-                kcp.WndSize(128, 128);
+
+                // 设置接收窗口/发送窗口
+                kcp.WndSize(kSendWnd, kRecvWnd);
             }
         }
 
@@ -86,11 +91,20 @@ namespace Server
         {
             lock(kcp)
             {
+                // TODO: 需要调优
+                if (kcp.WaitSnd() == kSendWnd)
+                {
+                    // 累积太多KCP数据没有发送，也可以调高接收/发送窗口
+                    Close();
+                    return;
+                }
+
                 // 将消息交给KCP
                 int ret = kcp.Send(buffer);
                 Debug.Assert(ret == 0, "Send Data to KCP Failed!", "UDP");
+
+                kcp.Flush();
             }
-            needUpdateFlag = true;
         }
 
         // "处理"收到的网络消息
@@ -101,9 +115,9 @@ namespace Server
                 // 交给KCP处理
                 var ret = kcp.Input(buff);
                 Debug.Assert(ret == 0, "KCP INPUT数据出错！", "UDP");
-            }
 
-            needUpdateFlag = true;
+                kcp.Flush();
+            }
 
             checkReceiveKcpMessage();
         }
@@ -138,15 +152,12 @@ namespace Server
         private void kcpUpdate(UInt32 currentMs)
         {
 
-            if (currentMs >= nextUpdateTimeMs ||
-                needUpdateFlag)
+            if (currentMs >= nextUpdateTimeMs)
             {
                 lock(kcp)
                 {
                     kcp.Update(currentMs);
-
                     nextUpdateTimeMs = kcp.Check(currentMs);
-                    needUpdateFlag   = false;
                 }
 
                 checkReceiveKcpMessage();
@@ -177,9 +188,7 @@ namespace Server
         #region KCP相关
         private uint conv;
         private KCP  kcp;
-        private bool needUpdateFlag;
         private UInt32 nextUpdateTimeMs;
-
         #endregion
     }
 }
