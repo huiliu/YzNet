@@ -77,7 +77,6 @@ namespace Server
 
         public void Dispose()
         {
-            client.Dispose();
         }
 
         public void Close()

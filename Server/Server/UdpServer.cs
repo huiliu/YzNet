@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Threading.Tasks;
 using System.Net;
 using System.Net.Sockets;
 
@@ -12,11 +11,6 @@ namespace Server
     {
         // 服务关闭
         public event Action                                 OnServerClose;
-
-        // 处理收到的UDP数据
-        // 在UDP接收线程中执行，如果有耗时操作，应该放入到其它线程执行
-        public event Action<UdpReceiveResult, UdpServer>    OnReceiveMessage;
-        public event Action<EndPoint, byte[], int> OnMessageReceived;
 
         public UdpServer()
         {
@@ -31,11 +25,13 @@ namespace Server
             recvBuffer = new byte[1024 * 32];
             recvSAEA = new SocketAsyncEventArgs();
             recvSAEA.Completed += onRecvCompleted;
+
+            sessionMgr = new UdpSessionMgr();
         }
 
         public void Dispose()
         {
-            lisener.Dispose();
+            socket.Dispose();
         }
 
         // 启动UDP服务，开始接受"新连接"和数据
@@ -43,7 +39,7 @@ namespace Server
         {
             if (state != ServerState.Closed ||
                 cfg == null ||
-                lisener != null)
+                socket != null)
             {
                 Debug.Assert(false, "Server已经启动!", "Server");
                 return;
@@ -52,56 +48,36 @@ namespace Server
             this.cfg = cfg;
 
             // 侦听Udp端口
-            lisener = new UdpClient(new IPEndPoint(IPAddress.Parse(cfg.IP), cfg.Port));
+            IPAddress address = IPAddress.Parse(cfg.IP);
+            socket = new Socket(address.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
+            socket.Bind(new IPEndPoint(address, cfg.Port));
 
-            lisener.Client.Blocking = false;
-            lisener.Client.SendBufferSize    = 1024 * 32;
-            lisener.Client.ReceiveBufferSize = 1024 * 32;
+            socket.Blocking          = false;
+            socket.SendBufferSize    = 1024 * 32;
+            socket.ReceiveBufferSize = 1024 * 32;
 
             state = ServerState.Start;
 
-            // 开始收取网络数据
-            // 在一个独立线程中执行
-            Task.Run(async () =>
-            {
-                await startReceive();
-            });
+            startReceive();
         }
 
         // 停止服务
         public void Stop()
         {
             state = ServerState.Closed;
-            lisener.Close();
+            socket.Close();
 
             OnServerClose?.Invoke();
         }
 
-        // 开始接收数据
-        public async Task startReceive()
+        private void startReceive()
         {
-            while (state == ServerState.Start)
-            {
-                try
-                {
-                    var receiveResult = await lisener.ReceiveAsync();
-                    handleReceiveMessage(receiveResult);
-                }
-                catch (Exception e)
-                {
-                    shouldBeClose(e);
-                    return;
-                }
-            }
-        }
-
-        private void startReceiveEx()
-        {
+            recvSAEA.RemoteEndPoint = new IPEndPoint(IPAddress.Any, 0);
             recvSAEA.SetBuffer(recvBuffer, 0, recvBuffer.Length);
 
             try
             {
-                if (!socket.ReceiveAsync(recvSAEA))
+                if (!socket.ReceiveFromAsync(recvSAEA))
                 {
                     onRecvCompleted(this, recvSAEA);
                 }
@@ -110,7 +86,6 @@ namespace Server
             {
                 shouldBeClose(e);
             }
-
         }
 
         private void onRecvCompleted(object sender, SocketAsyncEventArgs e)
@@ -122,9 +97,10 @@ namespace Server
             }
 
             // 处理收到的网络消息，如果使用异步，需要将BUFFER拷贝一份
-            OnMessageReceived?.Invoke(e.RemoteEndPoint, e.Buffer, e.BytesTransferred);
+            sessionMgr.OnMessageReceived(this, e.RemoteEndPoint, e.Buffer, e.BytesTransferred);
 
-            startReceiveEx();
+            // 继续收取
+            startReceive();
         }
         // 发送消息至remoteEndPoint
         public void SendMessage(byte[] buff, object remoteEndPoint = null)
@@ -163,7 +139,7 @@ namespace Server
         {
             try
             {
-                if (!lisener.Client.SendToAsync(e))
+                if (!socket.SendToAsync(e))
                 {
                     onSendCompleted(null, sendSAEA);
                 }
@@ -209,11 +185,6 @@ namespace Server
             }
         }
 
-        private void handleReceiveMessage(UdpReceiveResult result)
-        {
-            OnReceiveMessage?.Invoke(result, this);
-        }
-
         private void shouldBeClose(Exception e)
         {
             Console.WriteLine("捕捉到异常：{0}\nStackTrace: {1}", e.Message, e.StackTrace);
@@ -227,7 +198,6 @@ namespace Server
 
         private ServerState     state;
         private ServerConfig    cfg;
-        private UdpClient       lisener;
         private Socket          socket;
         private Queue<DatagramPacket> toBeSendingQueue;
         private bool isSending;
@@ -235,6 +205,8 @@ namespace Server
 
         private byte[] recvBuffer;
         private SocketAsyncEventArgs recvSAEA;
+
+        private UdpSessionMgr sessionMgr;
 
         sealed class DatagramPacket
         {

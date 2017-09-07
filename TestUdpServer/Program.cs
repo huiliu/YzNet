@@ -25,7 +25,6 @@ namespace TestUdpServer
             s.StartServiceOn(cfg);
 
             UdpServer us = new UdpServer();
-            us.OnReceiveMessage += UDPMessageDispatcher.Instance.HandleReceiveMessage;
             us.StartServiceOn(cfg);
 
             CommandDispatcher.Instance.Start();
@@ -40,7 +39,7 @@ namespace TestUdpServer
             newSession.IsConnected = true;
             newSession.CanReceive  = true;
 
-            newSession.SendMessage(MsgUdpKey.Pack(UdpSessionMgr.Instance.GetFreeConv()));
+            newSession.SendMessage(MsgUdpKey.Pack(Utils.GetConvNext()));
         }
     }
 }

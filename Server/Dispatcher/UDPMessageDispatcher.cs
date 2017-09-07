@@ -22,22 +22,6 @@ namespace Server
             throw new NotImplementedException();
         }
 
-        // 处理收到的UDP消息
-        public void HandleReceiveMessage(UdpReceiveResult result, UdpServer server)
-        {
-            var remoteEndPoint = result.RemoteEndPoint;
-            var data = result.Buffer;
-
-            uint conv = 0;
-            KCP.ikcp_decode32u(data, 0, ref conv);
-
-            UdpSession session = UdpSessionMgr.Instance.GetOrCreateUDPSession(conv, remoteEndPoint, server);
-            if (session != null)
-            {
-                session.OnReceiveMessage(data);
-            }
-        }
-
         public override void OnDisconnected(Session session)
         {
             throw new NotImplementedException();

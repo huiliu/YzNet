@@ -19,13 +19,13 @@ namespace Server
         private static int kSendWnd = 128;  // 发送窗口
         private static int kRecvWnd = 128;  // 接收窗口
 
-        public static UdpSession Create(uint conv, IPEndPoint clientEndPoint, UdpServer server)
+        public static UdpSession Create(uint conv, EndPoint clientEndPoint, UdpServer server)
         {
             var session = new UdpSession(conv, clientEndPoint, server);
             return session;
         }
 
-        public UdpSession(uint conv, IPEndPoint clientEndPoint, UdpServer server)
+        public UdpSession(uint conv, EndPoint clientEndPoint, UdpServer server)
         {
             this.conv = conv;
             this.remoteEndPoint = clientEndPoint;
@@ -44,7 +44,7 @@ namespace Server
 
                     // 将KCP中消息通过UDP Server发送给目标
                     byte[] b = new byte[sz];
-                    Buffer.BlockCopy(buff, 0, b, 0, sz);
+                    Array.Copy(buff, 0, b, 0, sz);
                     server.SendMessage(b, remoteEndPoint);
                 }
                 catch (Exception e)
@@ -182,7 +182,7 @@ namespace Server
             startUpdate();
         }
 
-        private IPEndPoint remoteEndPoint;
+        private EndPoint remoteEndPoint;
         private UdpServer server;
 
         #region KCP相关
