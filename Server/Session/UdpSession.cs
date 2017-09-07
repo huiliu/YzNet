@@ -51,8 +51,11 @@ namespace Server
             });
 
             // TODO: 配置KCP参数
-            kcp.NoDelay(1, 10, 2, 1);
-            kcp.WndSize(128, 128);
+            lock(kcp)
+            {
+                kcp.NoDelay(1, 10, 2, 1);
+                kcp.WndSize(128, 128);
+            }
         }
 
         public void Dispose()
@@ -81,18 +84,25 @@ namespace Server
         // 发送网络消息
         public override void SendMessage(byte[] buffer)
         {
-            // 将消息交给KCP
-            int ret = kcp.Send(buffer);
-            Debug.Assert(ret == 0, "Send Data to KCP Failed!", "UDP");
+            lock(kcp)
+            {
+                // 将消息交给KCP
+                int ret = kcp.Send(buffer);
+                Debug.Assert(ret == 0, "Send Data to KCP Failed!", "UDP");
+            }
             needUpdateFlag = true;
         }
 
         // "处理"收到的网络消息
         public void OnReceiveMessage(byte[] buff)
         {
-            // 交给KCP处理
-            var ret = kcp.Input(buff);
-            Debug.Assert(ret == 0, "KCP INPUT数据出错！", "UDP");
+            lock(kcp)
+            {
+                // 交给KCP处理
+                var ret = kcp.Input(buff);
+                Debug.Assert(ret == 0, "KCP INPUT数据出错！", "UDP");
+            }
+
             needUpdateFlag = true;
 
             checkReceiveKcpMessage();
@@ -108,14 +118,17 @@ namespace Server
         // 检查KCP是否有消息需要处理
         private void checkReceiveKcpMessage()
         {
-            // 读取KCP中的消息
-            for (var sz = kcp.PeekSize(); sz > 0; sz = kcp.PeekSize())
+            lock(kcp)
             {
-                byte[] b = new byte[sz];
-                if (kcp.Recv(b) > 0)
+                // 读取KCP中的消息
+                for (var sz = kcp.PeekSize(); sz > 0; sz = kcp.PeekSize())
                 {
-                    // 将消息分发
-                    dispatcher.OnMessageReceived(this, b);
+                    byte[] b = new byte[sz];
+                    if (kcp.Recv(b) > 0)
+                    {
+                        // 将消息分发
+                        dispatcher.OnMessageReceived(this, b);
+                    }
                 }
             }
         }
@@ -128,10 +141,13 @@ namespace Server
             if (currentMs >= nextUpdateTimeMs ||
                 needUpdateFlag)
             {
-                kcp.Update(currentMs);
+                lock(kcp)
+                {
+                    kcp.Update(currentMs);
 
-                nextUpdateTimeMs = kcp.Check(currentMs);
-                needUpdateFlag   = false;
+                    nextUpdateTimeMs = kcp.Check(currentMs);
+                    needUpdateFlag   = false;
+                }
 
                 checkReceiveKcpMessage();
             }

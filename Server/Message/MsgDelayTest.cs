@@ -22,19 +22,16 @@ namespace Server.Message
             Buffer = Encoding.UTF8.GetBytes(temp);
         }
 
-        public UInt32 ClientSendTime    { get; set; }
-        public UInt32 ClientReceiveTime { get; set; }
-        public UInt32 ServerSendTime    { get; set; }
-        public UInt32 ServerReceiveTime { get; set; }
+        public long ClientSendTime    { get; set; }
+        public long ClientReceiveTime { get; set; }
+        public long ServerSendTime    { get; set; }
+        public long ServerReceiveTime { get; set; }
         public byte[] Buffer { get; private set; }
 
         public override string ToString()
         {
-            return string.Format("Client SendTime: {0} Client ReceiveTime: {1} Server ReceiveTime: {2} Server SendTime: {3}, {4}",
-                ClientSendTime,
-                ClientReceiveTime,
-                ServerSendTime,
-                ServerReceiveTime,
+            return string.Format("RRT: {0} BufferLength: {1}",
+                ClientReceiveTime - ClientSendTime,
                 Buffer.Length);
         }
     }

@@ -110,9 +110,12 @@ namespace Server
         // "处理"收到的网络消息
         private void OnReceiveMessage(byte[] buff)
         {
-            // 交给KCP处理
-            var ret = kcp.Input(buff);
-            Debug.Assert(ret == 0, "KCP INPUT数据出错！", "UDP");
+            lock(kcp)
+            {
+                // 交给KCP处理
+                var ret = kcp.Input(buff);
+                Debug.Assert(ret == 0, "KCP INPUT数据出错！", "UDP");
+            }
             needUpdateFlag = true;
 
             checkKcpReceiveMessage();
@@ -120,14 +123,17 @@ namespace Server
 
         private void checkKcpReceiveMessage()
         {
-            // 读取KCP中的消息
-            for (var sz = kcp.PeekSize(); sz > 0; sz = kcp.PeekSize())
+            lock(kcp)
             {
-                byte[] b = new byte[sz];
-                if (kcp.Recv(b) > 0)
+                // 读取KCP中的消息
+                for (var sz = kcp.PeekSize(); sz > 0; sz = kcp.PeekSize())
                 {
-                    // 将消息分发
-                    OnMessageReceived?.Invoke(this, b, 0, sz);
+                    byte[] b = new byte[sz];
+                    if (kcp.Recv(b) > 0)
+                    {
+                        // 将消息分发
+                        OnMessageReceived?.Invoke(this, b, 0, sz);
+                    }
                 }
             }
         }
@@ -137,8 +143,12 @@ namespace Server
         // 发送消息
         public void SendMessage(byte[] buff)
         {
-            int ret = kcp.Send(buff);
-            Debug.Assert(ret == 0, "Send Data into KCP Failed", this.ToString());
+            lock(kcp)
+            {
+                int ret = kcp.Send(buff);
+                Debug.Assert(ret == 0, "Send Data into KCP Failed", this.ToString());
+            }
+
             needUpdateFlag = true;
         }
 
@@ -157,14 +167,17 @@ namespace Server
         // KCP定时Update
         private void kcpUpdate(UInt32 currentMs)
         {
-            checkKcpReceiveMessage();
-
             if (needUpdateFlag || currentMs >= nextUpdateTimeMs)
             {
-                kcp.Update(currentMs);
+                lock(kcp)
+                {
+                    kcp.Update(currentMs);
 
-                nextUpdateTimeMs = kcp.Check(currentMs);
-                needUpdateFlag   = false;
+                    nextUpdateTimeMs = kcp.Check(currentMs);
+                    needUpdateFlag   = false;
+                }
+
+                checkKcpReceiveMessage();
                 //Console.WriteLine("Kcp Update: {0}, NextTime: {1}", Utils.IClock(), nextUpdateTimeMs);
             }
         }

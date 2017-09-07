@@ -58,12 +58,9 @@ namespace TestTcpServer
             Console.WriteLine(string.Format("[{0}]连接关闭！", session.GetId()));
         }
 
-        private static long total = 0;
         public override void OnMessageReceived(Session session, byte[] data)
         {
-            //total += data.Length;
-            //Console.WriteLine(total);
-            // RandomClose(session);
+            RandomClose(session);
             session.SendMessage(data);
         }
 
@@ -74,7 +71,7 @@ namespace TestTcpServer
 
         private void RandomClose(Session client)
         {
-            if (Utils.IClock() % 91 == 1)
+            if (Utils.IClock() % 10001 == 1)
             {
                 Console.WriteLine("随机关闭一个客户端");
                 client.Close();

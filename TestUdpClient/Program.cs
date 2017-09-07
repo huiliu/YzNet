@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -14,6 +15,7 @@ namespace TestUdpClient
     class Program
     {
         static ClientCfg cfg;
+        static IMessageDispatcher dispatcher = new TempMessageDispatcher();
         static void Main(string[] args)
         {
             start(10);
@@ -29,7 +31,7 @@ namespace TestUdpClient
             for (int i = 0; i < num; ++i)
             {
                 var client = await TcpConnector.ConnectTcpServer(cfg);
-                client.SetMessageDispatcher(TempMessageDispatcher.Instance);
+                client.SetMessageDispatcher(dispatcher);
                 client.IsConnected = true;
                 client.CanReceive = true;
             }
@@ -38,18 +40,22 @@ namespace TestUdpClient
 
     class TempMessageDispatcher : IMessageDispatcher
     {
-        public static IMessageDispatcher Instance = new TempMessageDispatcher();
-        private TempMessageDispatcher()
+        public TempMessageDispatcher()
         {
 
         }
 
         public override void OnDisconnected(Session session)
         {
-            Console.WriteLine(string.Format("[{0}]连接关闭！", session.GetId()));
+            var rrt = rrts[session.GetId()];
+            Console.WriteLine(string.Format("[{0}]连接关闭！ 收到总包数: {1} RRT: [Min: {2} Max: {3} Avg: {4}]",
+                session.GetId(),
+                rrt.Count,
+                rrt.Min(),
+                rrt.Max(),
+                rrt.Average()));
         }
 
-        private static long total = 0;
         public override void OnMessageReceived(Session session, byte[] data)
         {
             var msg = MsgUdpKey.UnPack(data);
@@ -63,6 +69,8 @@ namespace TestUdpClient
             ReliableUdpClient uc = new ReliableUdpClient(cfg, msg.Conv);
             uc.OnMessageReceived += handleUdpOnMessageReceived;
             uc.Connect();
+
+            rrts.TryAdd(msg.Conv, new List<long>());
 
             MsgDelayTest buff = new MsgDelayTest();
             buff.ClientSendTime = Utils.IClock();
@@ -84,14 +92,17 @@ namespace TestUdpClient
             }
         }
 
-        private static void handleUdpOnMessageReceived(ReliableUdpClient arg1, byte[] arg2, int arg3, int arg4)
+        private void handleUdpOnMessageReceived(ReliableUdpClient arg1, byte[] arg2, int arg3, int arg4)
         {
             var msg = MessagePack.MessagePackSerializer.Deserialize<MsgDelayTest>(arg2);
             msg.ClientReceiveTime = Utils.IClock();
-            Console.WriteLine("Udp[{0}]： {1}", arg1.GetID(), msg.ToString());
+
+            rrts[arg1.GetID()].Add(msg.ClientReceiveTime - msg.ClientSendTime);
 
             msg.ClientSendTime = Utils.IClock();
             arg1.SendMessage(MessagePack.MessagePackSerializer.Serialize(msg));
         }
+
+        private ConcurrentDictionary<uint, List<long>> rrts = new ConcurrentDictionary<uint, List<long>>();
     }
 }

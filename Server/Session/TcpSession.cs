@@ -143,6 +143,7 @@ namespace Server
         // 发送Buffer
         private void sendMessageImpl(byte[] data)
         {
+            ++statistics.SendPacketCount;
             // 添加消息头
             var buff = MessageHeader.Encoding(data);
 
@@ -150,6 +151,8 @@ namespace Server
             {
                 if (isSending)
                 {
+                    ++statistics.SendByQueue;
+
                     // 正在发送中，写入发送队列
                     toBeSendQueue.Enqueue(new ArraySegment<byte>(buff));
                     return;
@@ -172,14 +175,13 @@ namespace Server
                 sendSAEA.SetBuffer(null, 0, 0);
                 sendSAEA.BufferList = queue;
 
+                ++statistics.CallSendAsyncCount;
                 var ret = socket.SendAsync(sendSAEA);
                 if (!ret)
                 {
                     // 同步完成
                     sendSAEACompleted(null, sendSAEA);
                 }
-
-                ++statistics.SendPacketCount;
             }
             catch (Exception e)
             {
