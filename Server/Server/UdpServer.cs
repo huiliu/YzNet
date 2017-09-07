@@ -16,6 +16,7 @@ namespace Server
         // 处理收到的UDP数据
         // 在UDP接收线程中执行，如果有耗时操作，应该放入到其它线程执行
         public event Action<UdpReceiveResult, UdpServer>    OnReceiveMessage;
+        public event Action<EndPoint, byte[], int> OnMessageReceived;
 
         public UdpServer()
         {
@@ -24,7 +25,12 @@ namespace Server
             isSending = false;
             toBeSendingQueue = new Queue<DatagramPacket>();
             sendSAEA = new SocketAsyncEventArgs();
-            sendSAEA.Completed += SendCompleted;
+            sendSAEA.Completed += onSendCompleted;
+
+            // TODO: 优化
+            recvBuffer = new byte[1024 * 32];
+            recvSAEA = new SocketAsyncEventArgs();
+            recvSAEA.Completed += onRecvCompleted;
         }
 
         public void Dispose()
@@ -89,6 +95,37 @@ namespace Server
             }
         }
 
+        private void startReceiveEx()
+        {
+            recvSAEA.SetBuffer(recvBuffer, 0, recvBuffer.Length);
+
+            try
+            {
+                if (!socket.ReceiveAsync(recvSAEA))
+                {
+                    onRecvCompleted(this, recvSAEA);
+                }
+            }
+            catch (Exception e)
+            {
+                shouldBeClose(e);
+            }
+
+        }
+
+        private void onRecvCompleted(object sender, SocketAsyncEventArgs e)
+        {
+            if (e.SocketError != SocketError.Success)
+            {
+                shouldBeClose(e.SocketError);
+                return;
+            }
+
+            // 处理收到的网络消息，如果使用异步，需要将BUFFER拷贝一份
+            OnMessageReceived?.Invoke(e.RemoteEndPoint, e.Buffer, e.BytesTransferred);
+
+            startReceiveEx();
+        }
         // 发送消息至remoteEndPoint
         public void SendMessage(byte[] buff, object remoteEndPoint = null)
         {
@@ -128,7 +165,7 @@ namespace Server
             {
                 if (!lisener.Client.SendToAsync(e))
                 {
-                    SendCompleted(null, sendSAEA);
+                    onSendCompleted(null, sendSAEA);
                 }
             }
             catch (Exception err)
@@ -137,7 +174,7 @@ namespace Server
             }
         }
 
-        private void SendCompleted(object sender, SocketAsyncEventArgs e)
+        private void onSendCompleted(object sender, SocketAsyncEventArgs e)
         {
             if (e.SocketError != SocketError.Success)
             {
@@ -191,9 +228,13 @@ namespace Server
         private ServerState     state;
         private ServerConfig    cfg;
         private UdpClient       lisener;
+        private Socket          socket;
         private Queue<DatagramPacket> toBeSendingQueue;
         private bool isSending;
         private SocketAsyncEventArgs sendSAEA;
+
+        private byte[] recvBuffer;
+        private SocketAsyncEventArgs recvSAEA;
 
         sealed class DatagramPacket
         {
