@@ -25,8 +25,8 @@ namespace Server
             clientCfg.IP = "127.0.0.1";
             clientCfg.Port = 1234;
 
-            ReliableUdpClient uc = new ReliableUdpClient(clientCfg, 1);
-            uc.Connect();
+            ReliableUdpClient uc = new ReliableUdpClient(1);
+            uc.Connect(clientCfg.IP, clientCfg.Port);
 
             uc.SendMessage(Encoding.UTF8.GetBytes("Hello World!"));
 

@@ -87,9 +87,9 @@ namespace TestUdpClient
             cfg.IP = "127.0.0.1";
             cfg.Port = 1234;
 
-            ReliableUdpClient uc = new ReliableUdpClient(cfg, msg.Conv);
+            ReliableUdpClient uc = new ReliableUdpClient(msg.Conv);
             uc.OnMessageReceived += handleUdpOnMessageReceived;
-            uc.Connect();
+            uc.Connect(cfg.IP, cfg.Port);
 
             rrts.TryAdd(msg.Conv, new List<long>());
 

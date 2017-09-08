@@ -33,9 +33,5 @@ namespace Server
         {
             session.SendMessage(data);
         }
-
-        public void OnUdpMessageReceived(UdpReceiveResult result, UdpServer server)
-        {
-        }
     }
 }

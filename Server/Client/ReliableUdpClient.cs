@@ -30,12 +30,13 @@ namespace Server
             toBeSendQueue = new Queue<ArraySegment<byte>>();
 
             kcp = new KCP(conv, kcpOut);
-
             lock(kcp)
             {
                 kcp.NoDelay(1, 10, 2, 1);
                 kcp.WndSize(NetworkCommon.KcpSendWnd, NetworkCommon.KcpRecvWnd);
             }
+
+            statistics = new NetStatistics(null);
 
             // TODO: 优化
             Task.Run(() =>
@@ -103,7 +104,7 @@ namespace Server
 
             try
             {
-                if (!socket.ReceiveFromAsync(recvSAEA))
+                if (!socket.ReceiveAsync(recvSAEA))
                 {
                     onRecvCompleted(this, recvSAEA);
                 }
@@ -128,8 +129,9 @@ namespace Server
             }
 
             // TODO: 优化
-            recvData = new ArraySegment<byte>(e.Buffer, e.Offset, e.BytesTransferred);
-            OnReceiveMessage(recvData.Array);
+            byte[] recvData = new byte[e.BytesTransferred];
+            Array.Copy(e.Buffer, e.Offset, recvData, 0, e.BytesTransferred);
+            OnReceiveMessage(recvData);
 
             // 继续收取
             startReceive();
@@ -172,6 +174,9 @@ namespace Server
         // 发送消息
         public void SendMessage(byte[] buff)
         {
+            // 添加消息头
+            // var data = MessageHeader.Encoding(buff);
+
             lock(kcp)
             {
                 // TODO: 需要调优
@@ -210,8 +215,6 @@ namespace Server
         private void sendMessageImpl(byte[] data)
         {
             ++statistics.SendPacketCount;
-            // 添加消息头
-            var buff = MessageHeader.Encoding(data);
 
             lock(toBeSendQueue)
             {
@@ -220,7 +223,7 @@ namespace Server
                     ++statistics.SendByQueue;
 
                     // 正在发送中，写入发送队列
-                    toBeSendQueue.Enqueue(new ArraySegment<byte>(buff));
+                    toBeSendQueue.Enqueue(new ArraySegment<byte>(data));
                     if (toBeSendQueue.Count >= NetworkCommon.MaxCacheMessage)
                     {
                         // 消息缓存数超过上限
@@ -235,7 +238,7 @@ namespace Server
             }
 
             // 直接发送
-            var sendQueue = new SendingQueue(buff);
+            var sendQueue = new SendingQueue(data);
             sendToSocket(sendQueue);
        }
 
@@ -282,7 +285,6 @@ namespace Server
                 return;
             }
 
-            Console.WriteLine("sendMessage: {0}bytes", e.BytesTransferred);
             if (srcQueue.Trim(e.BytesTransferred))
             {
                 statistics.TotalSendBytes += e.BytesTransferred;
@@ -451,7 +453,7 @@ namespace Server
 
         private void shouldBeClose(Exception e)
         {
-            Debug.WriteLine(string.Format("发生错误！Message: {0}\nStackTrace: {1}", e.Message, e.StackTrace), "UdpCLient");
+            Console.WriteLine(string.Format("发生错误！Message: {0}\nStackTrace: {1}", e.Message, e.StackTrace), "UdpCLient");
             Close();
         }
 
@@ -476,7 +478,6 @@ namespace Server
         private Socket socket;
 
         private byte[]               recvBuffer;
-        private ArraySegment<byte>   recvData;
         private SocketAsyncEventArgs recvSAEA;
 
         private bool isSending;

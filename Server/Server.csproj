@@ -61,8 +61,8 @@
   <ItemGroup>
     <Compile Include="Buffer\ByteBuffer.cs" />
     <Compile Include="Buffer\RingBuffer.cs" />
-    <Compile Include="Client\AsyncTcpClient.cs" />
-    <Compile Include="Client\AsyncUdpClient.cs" />
+    <Compile Include="Client\TcpConnector.cs" />
+    <Compile Include="Client\ReliableUdpClient.cs" />
     <Compile Include="Common\MessageHeader.cs" />
     <Compile Include="Common\NetworkCommon.cs" />
     <Compile Include="Dispatcher\CommandDispatcher.cs" />

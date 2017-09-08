@@ -109,7 +109,7 @@ namespace Server
             if (e.BytesTransferred <= 0 || e.SocketError != SocketError.Success)
             {
                 // 发生错误
-                shouldBeClose(new InvalidOperationException());
+                shouldBeClose(new InvalidOperationException("对方关闭连接或接收数据出错"));
                 return;
             }
 

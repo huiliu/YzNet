@@ -45,7 +45,7 @@ namespace Server
         public override string ToString()
         {
             return string.Format("Session[{0}]\nTotalSendBytes: {1}\nTotalRecvBytes: {2}\nCallSendAsyncCount: {3}\nSendPacket: {4}\nRecvPacket: {5}\nSendByQueue: {6}",
-                s.GetId(),
+                s?.GetId(),
                 TotalSendBytes, TotalRecvBytes,
                 CallSendAsyncCount,
                 SendPacketCount, RecvPacketCount,
