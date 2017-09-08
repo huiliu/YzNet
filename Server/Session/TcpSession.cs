@@ -106,7 +106,7 @@ namespace Server
                 return;
             }
 
-            if (e.SocketError != SocketError.Success)
+            if (e.BytesTransferred <= 0 || e.SocketError != SocketError.Success)
             {
                 // 发生错误
                 shouldBeClose(new InvalidOperationException());

@@ -125,9 +125,9 @@ namespace Server
 
         private void sendMessageImpl(byte[] buff, IPEndPoint endPoint)
         {
-            sendSAEA.UserToken = 0;
-            sendSAEA.SocketError = SocketError.Success;
-            sendSAEA.SocketFlags = SocketFlags.None;
+            // TODO: 优化
+            sendSAEA = new SocketAsyncEventArgs();
+            sendSAEA.Completed += onSendCompleted;
             sendSAEA.RemoteEndPoint = endPoint;
             sendSAEA.SetBuffer(buff, 0, buff.Length);
 
@@ -152,7 +152,7 @@ namespace Server
 
         private void onSendCompleted(object sender, SocketAsyncEventArgs e)
         {
-            if (e.SocketError != SocketError.Success)
+            if (e.BytesTransferred > 0 && e.SocketError != SocketError.Success)
             {
                 Console.WriteLine("ERROR remoteEndPoint: {0}", e.RemoteEndPoint);
                 isSending = false;
@@ -164,6 +164,7 @@ namespace Server
             {
                 // 未完成发送
                 e.SetBuffer(e.Buffer, e.Offset, e.Buffer.Length - e.BytesTransferred);
+                Console.WriteLine("UDP包没有发送完！{0}/{1}", e.BytesTransferred, e.Buffer.Length);
                 sendToSocketEx(e);
             }
             else

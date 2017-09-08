@@ -64,6 +64,7 @@
     <Compile Include="Client\AsyncTcpClient.cs" />
     <Compile Include="Client\AsyncUdpClient.cs" />
     <Compile Include="Common\MessageHeader.cs" />
+    <Compile Include="Common\NetworkCommon.cs" />
     <Compile Include="Dispatcher\CommandDispatcher.cs" />
     <Compile Include="Dispatcher\UDPMessageDispatcher.cs" />
     <Compile Include="Kcp\kcp.cs" />
