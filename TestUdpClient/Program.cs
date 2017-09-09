@@ -29,19 +29,50 @@ namespace TestUdpClient
             cfg.IP = "127.0.0.1";
             cfg.Port = 1234;
 
-            for (int i = 0; i < num; ++i)
+            for (var i = 0; i < num; ++i)
             {
-                var client = await TcpConnector.ConnectTcpServer(cfg);
-                client.SetMessageDispatcher(dispatcher);
-                client.IsConnected = true;
-                client.CanReceive = true;
-
-                Task.Run(() =>
+                INetSession session = null;
+                var connector = new TcpConnector();
+                connector.ConnectServer(cfg.IP, cfg.Port, (INetSession s, bool succ, string errmsg) =>
                 {
-                    Thread.Sleep(1000 * 60 * 3);
-                    client.Close();
+                    if (!succ)
+                    {
+                        Console.WriteLine("连接失败！");
+                        return;
+                    }
+
+                    session = s;
+
+                    session.SetMessageDispatcher(dispatcher);
+                    session.IsConnected = true;
+                    session.CanReceive = true;
+                    //dispatcher.rrts.TryAdd(session.GetId(), new List<long>());
+
+                    //var msg = new MsgDelayTest();
+                    //msg.ClientSendTime = Utils.IClock();
+                    //session.SendMessage(MessagePack.MessagePackSerializer.Serialize(msg));
+
+                    Task.Run(() =>
+                    {
+                        Thread.Sleep(1000 * 60 * 3);
+                        session.Close();
+                    });
                 });
             }
+
+            //for (int i = 0; i < num; ++i)
+            //{
+            //    var client = await TcpConnector.ConnectTcpServer(cfg);
+            //    client.SetMessageDispatcher(dispatcher);
+            //    client.IsConnected = true;
+            //    client.CanReceive = true;
+
+            //    Task.Run(() =>
+            //    {
+            //        Thread.Sleep(1000 * 60 * 3);
+            //        client.Close();
+            //    });
+            //}
         }
     }
 
@@ -52,7 +83,7 @@ namespace TestUdpClient
 
         }
 
-        public override void OnDisconnected(Session session)
+        public override void OnDisconnected(INetSession session)
         {
             var rrt = rrts[session.GetId()];
 
@@ -77,7 +108,7 @@ namespace TestUdpClient
                 rrt.Average()));
         }
 
-        public override void OnMessageReceived(Session session, byte[] data)
+        public override void OnMessageReceived(INetSession session, byte[] data)
         {
             var msg = MsgUdpKey.UnPack(data);
 

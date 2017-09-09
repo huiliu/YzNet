@@ -4,7 +4,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 
-namespace Server
+namespace YezhStudio.Base.Network
 {
     public class ClientCfg
     {
@@ -99,14 +99,13 @@ namespace Server
 
                 var session = new TcpSession(socket);
                 // 开始接收数据
-                //session.IsConnected = true;
-                //session.CanReceive = true;
+                session.startReceive();
                 // 调用回调
                 cb(session, true, "连接成功!");
             }
             catch (Exception e)
             {
-                Console.Write(string.Format("连接远程服务器出错！\nMessage: {0}\nStackTrace: {1}\n", e.Message, e.StackTrace), "Connector");
+                MainLog.Instance.Error(string.Format("连接远程服务器出错！\nMessage: {0}\nStackTrace: {1}\n", e.Message, e.StackTrace), "Connector");
             }
         }
 
@@ -157,9 +156,8 @@ namespace Server
 
             // 连接成功
             var session = new TcpSession(socket);
-            //// 开始接收数据
-            //session.IsConnected = true;
-            //session.CanReceive = true;
+            // 开始接收数据
+            session.startReceive();
             // 调用回调
             token.callback(session, true, "连接成功!");
         }

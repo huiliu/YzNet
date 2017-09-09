@@ -15,7 +15,7 @@ namespace Server
     }
 
     // 表示一个会话，可能是TCP，也可能是UDP
-    public abstract class Session
+    public abstract class INetSession
     {
         private bool isConnected;
         public bool IsConnected

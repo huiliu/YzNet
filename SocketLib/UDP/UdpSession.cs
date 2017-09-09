@@ -1,23 +1,14 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Net;
-using System.Net.Sockets;
-using System.Text;
-using System.Threading.Tasks;
 
-using MessagePack;
-using Server.Message;
-
-namespace Server
+namespace YezhStudio.Base.Network
 {
     // UDP会话
     // 表示一个UDP客户端与UDP服务器的连接，使用KCP协议通讯，用conv来标识用户身份
     // TODO: 只用一个uint32数来识别客户端，可能不安全
     public class UdpSession : INetSession, IDisposable
     {
-        // KCP相关参数
-        private static int kSendWnd = 128;  // 发送窗口
-        private static int kRecvWnd = 128;  // 接收窗口
 
         public static UdpSession Create(uint conv, EndPoint clientEndPoint, UdpServer server)
         {
@@ -27,11 +18,13 @@ namespace Server
 
         public UdpSession(uint conv, EndPoint clientEndPoint, UdpServer server)
         {
-            this.conv = conv;
-            this.remoteEndPoint = clientEndPoint;
-            this.server = server;
+            this.conv      = conv;
+            this.server    = server;
+            SessionID      = conv;
+            remoteEndPoint = clientEndPoint;
+            IsConnected    = true;
 
-            this.nextUpdateTimeMs = Utils.IClock();
+            nextUpdateTimeMs = Utils.IClock();
 
             kcp = new KCP(conv, (buff, sz) =>
             {
@@ -59,8 +52,9 @@ namespace Server
                 kcp.NoDelay(1, 10, 2, 1);
 
                 // 设置接收窗口/发送窗口
-                kcp.WndSize(kSendWnd, kRecvWnd);
+                kcp.WndSize(NetworkCommon.KcpSendWnd, NetworkCommon.KcpRecvWnd);
             }
+
         }
 
         public void Dispose()
@@ -71,9 +65,8 @@ namespace Server
         public override void Close()
         {
             IsConnected = false;
-            CanReceive = false;
 
-            dispatcher.OnDisconnected(this);
+            base.Close();
         }
 
         public void Shutdown()
@@ -81,9 +74,13 @@ namespace Server
             Close();
         }
 
-        public override uint GetId()
+        // KCP更新
+        public void Update()
         {
-            return conv;
+            while (IsConnected)
+            {
+                kcpUpdate(Utils.IClock());
+            }
         }
 
         // 发送网络消息
@@ -92,7 +89,7 @@ namespace Server
             lock(kcp)
             {
                 // TODO: 需要调优
-                if (kcp.WaitSnd() == kSendWnd)
+                if (kcp.WaitSnd() >= NetworkCommon.KcpSendWnd)
                 {
                     // 累积太多KCP数据没有发送，也可以调高接收/发送窗口
                     Close();
@@ -141,7 +138,7 @@ namespace Server
                     if (kcp.Recv(b) > 0)
                     {
                         // 将消息分发
-                        dispatcher.OnMessageReceived(this, b);
+                        triggerMessageReceived(this, b);
                     }
                 }
             }
@@ -164,22 +161,8 @@ namespace Server
             }
         }
 
-        // 启动KCP更新
-        private void startUpdate()
+        public override void startReceive()
         {
-            Task.Run(async () =>
-            {
-                while (IsConnected)
-                {
-                    kcpUpdate(Utils.IClock());
-                    await Task.Delay(5);
-                }
-            });
-        }
-
-        protected override void startReceive()
-        {
-            startUpdate();
         }
 
         private EndPoint remoteEndPoint;

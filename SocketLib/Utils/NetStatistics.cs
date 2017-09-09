@@ -2,9 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 
-namespace Server
+namespace YezhStudio.Base.Network
 {
     // 统计网络相关信息
     class NetStatistics : IDisposable
@@ -45,7 +44,7 @@ namespace Server
         public override string ToString()
         {
             return string.Format("Session[{0}]\nTotalSendBytes: {1}\nTotalRecvBytes: {2}\nCallSendAsyncCount: {3}\nSendPacket: {4}\nRecvPacket: {5}\nSendByQueue: {6}",
-                s?.GetId(),
+                s.SessionID,
                 TotalSendBytes, TotalRecvBytes,
                 CallSendAsyncCount,
                 SendPacketCount, RecvPacketCount,

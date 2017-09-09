@@ -37,16 +37,6 @@ namespace Server
             }
 
             statistics = new NetStatistics(null);
-
-            // TODO: 优化
-            Task.Run(() =>
-            {
-                while (!isConnected)
-                {
-                    kcpUpdate(Utils.IClock());
-                    Thread.Sleep(5);
-                }
-            });
         }
 
         // 连接服务器
@@ -66,6 +56,16 @@ namespace Server
 
                 // 开始接收网络数据
                 startReceive();
+
+                // TODO: 优化
+                Task.Run(() =>
+                {
+                    while (isConnected)
+                    {
+                        kcpUpdate(Utils.IClock());
+                        Thread.Sleep(5);
+                    }
+                });
             }
             catch (Exception e)
             {
@@ -154,18 +154,25 @@ namespace Server
 
         private void checkKcpReceiveMessage()
         {
-            lock(kcp)
+            try
             {
-                // 读取KCP中的消息
-                for (var sz = kcp.PeekSize(); sz > 0; sz = kcp.PeekSize())
+                lock(kcp)
                 {
-                    byte[] b = new byte[sz];
-                    if (kcp.Recv(b) > 0)
+                    // 读取KCP中的消息
+                    for (var sz = kcp.PeekSize(); sz > 0; sz = kcp.PeekSize())
                     {
-                        // 将消息分发
-                        OnMessageReceived?.Invoke(this, b, 0, sz);
+                        byte[] b = new byte[sz];
+                        if (kcp.Recv(b) > 0)
+                        {
+                            // 将消息分发
+                            OnMessageReceived?.Invoke(this, b, 0, sz);
+                        }
                     }
                 }
+            }
+            catch (Exception e)
+            {
+                shouldBeClose(e);
             }
         }
         #endregion
@@ -227,7 +234,7 @@ namespace Server
                     if (toBeSendQueue.Count >= NetworkCommon.MaxCacheMessage)
                     {
                         // 消息缓存数超过上限
-                        Debug.Write(string.Format("Session[{0}]消息缓存数超过上限！强制关闭连接", GetID()), ToString());
+                        Console.Write(string.Format("Session[{0}]消息缓存数超过上限！强制关闭连接", GetID()), ToString());
                         Close();
                     }
 
@@ -281,6 +288,7 @@ namespace Server
 
             if (e.SocketError != SocketError.Success)
             {
+                Console.WriteLine("Udp发送出错!");
                 Close();
                 return;
             }

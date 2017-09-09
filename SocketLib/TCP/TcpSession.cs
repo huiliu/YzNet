@@ -1,12 +1,9 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Collections.Generic;
-using System.Net;
 using System.Net.Sockets;
-using System.Threading;
-using System.Threading.Tasks;
 
-namespace Server
+namespace YezhStudio.Base.Network
 {
     // TCP会话
     // 表示一条TCP连接
@@ -20,24 +17,25 @@ namespace Server
 
         public TcpSession(Socket socket)
         {
-            this.id       = TcpSessionMgr.Instance.getSessionId();
-            this.socket   = socket;
+            this.socket = socket;
 
             // 设置socket参数
             socket.Blocking          = false;
             socket.NoDelay           = true;
-            socket.SendBufferSize    = 1;
-            socket.ReceiveBufferSize = 1;
+            socket.SendBufferSize    = NetworkCommon.TcpSendBuffer;
+            socket.ReceiveBufferSize = NetworkCommon.TcpRecvBuffer;
 
             recvSAEA      = new SocketAsyncEventArgs();
-            recvBuffer = new ByteBuffer(MessageHeader.MessageMaxLength);
+            recvSAEA.Completed  += recvSAEACompleted;
+            recvBuffer    = new ByteBuffer(NetworkCommon.MaxPackageSize);
 
             isSending     = false;
             sendSAEA      = new SocketAsyncEventArgs();
+            sendSAEA.Completed  += sendSAEACompleted;
             toBeSendQueue = new Queue<ArraySegment<byte>>();
 
-            recvSAEA.Completed  += recvSAEACompleted;
-            sendSAEA.Completed  += sendSAEACompleted;
+
+            IsConnected = true;
 
             statistics = new NetStatistics(this);
         }
@@ -47,32 +45,26 @@ namespace Server
         {
             statistics.Close();
 
-            CanReceive = false;
             IsConnected = false;
             socket.Close();
-            dispatcher.OnDisconnected(this);
+
+            base.Close();
         }
 
         public void Dispose()
         {
-            socket.Dispose();
             toBeSendQueue.Clear();
-        }
-
-        public override uint GetId()
-        {
-            return id;
         }
 
         private void shouldBeClose(Exception e)
         {
-            Console.WriteLine("[Id: {2}]捕捉到异常!\nMessage: {0}\nStackTrace: {1}", e.Message, e.StackTrace, GetId());
+            Console.WriteLine("[Id: {2}]捕捉到异常!\nMessage: {0}\nStackTrace: {1}", e.Message, e.StackTrace, SessionID);
             Close();
         }
 
         #region 接收网络消息
         // 开始接收网络消息
-        protected override void startReceive()
+        public override void startReceive()
         {
             if (recvBuffer.WriteableBytes == 0)
             {
@@ -100,7 +92,7 @@ namespace Server
 
         private void recvSAEACompleted(object sender, SocketAsyncEventArgs e)
         {
-            if (!IsConnected || !CanReceive)
+            if (!IsConnected)
             {
                 // Session状态不满足
                 return;
@@ -109,7 +101,7 @@ namespace Server
             if (e.BytesTransferred <= 0 || e.SocketError != SocketError.Success)
             {
                 // 发生错误
-                shouldBeClose(new InvalidOperationException("对方关闭连接或接收数据出错"));
+                shouldBeClose(new InvalidOperationException("接收操作失败或对方关闭了连接！"));
                 return;
             }
 
@@ -123,7 +115,7 @@ namespace Server
             while ((msg = MessageHeader.TryDecode(recvBuffer)) != null)
             {
                 ++statistics.RecvPacketCount;
-                dispatcher.OnMessageReceived(this, msg);
+                triggerMessageReceived(this, msg);
             }
 
             // 尝试调整Buffer
@@ -156,6 +148,13 @@ namespace Server
 
                     // 正在发送中，写入发送队列
                     toBeSendQueue.Enqueue(new ArraySegment<byte>(buff));
+                    if (toBeSendQueue.Count >= NetworkCommon.MaxCacheMessage)
+                    {
+                        // 消息缓存数超过上限
+                        Debug.Write(string.Format("Session[{0}]消息缓存数超过上限！强制关闭连接", SessionID), ToString());
+                        Close();
+                    }
+
                     return;
                 }
 
@@ -210,6 +209,7 @@ namespace Server
                 return;
             }
 
+            Console.WriteLine("sendMessage: {0}bytes", e.BytesTransferred);
             if (srcQueue.Trim(e.BytesTransferred))
             {
                 statistics.TotalSendBytes += e.BytesTransferred;
@@ -376,7 +376,6 @@ namespace Server
         }
         #endregion
 
-        private uint    id;
         private Socket  socket;
 
         ByteBuffer                      recvBuffer;

@@ -42,21 +42,32 @@ namespace TestTcpServer
 
             for (var i = 0; i < num; ++i)
             {
-                var client = await TcpConnector.ConnectTcpServer(cfg);
-                client.SetMessageDispatcher(dispatcher);
-                client.IsConnected = true;
-                client.CanReceive = true;
-
-                dispatcher.rrts.TryAdd(client.GetId(), new List<long>());
-
-                var msg = new MsgDelayTest();
-                msg.ClientSendTime = Utils.IClock();
-                client.SendMessage(MessagePack.MessagePackSerializer.Serialize(msg));
-
-                Task.Run(() =>
+                INetSession session = null;
+                var connector = new TcpConnector();
+                connector.ConnectServer(cfg.IP, cfg.Port, (INetSession s, bool succ, string errmsg) =>
                 {
-                    Thread.Sleep(1000 * 60 * 3);
-                    client.Close();
+                    if (!succ)
+                    {
+                        Console.WriteLine("连接失败！");
+                        return;
+                    }
+
+                    session = s;
+
+                    session.SetMessageDispatcher(dispatcher);
+                    session.IsConnected = true;
+                    session.CanReceive = true;
+                    dispatcher.rrts.TryAdd(session.GetId(), new List<long>());
+
+                    var msg = new MsgDelayTest();
+                    msg.ClientSendTime = Utils.IClock();
+                    session.SendMessage(MessagePack.MessagePackSerializer.Serialize(msg));
+
+                    Task.Run(() =>
+                    {
+                        Thread.Sleep(1000 * 60 * 3);
+                        session.Close();
+                    });
                 });
             }
         }
@@ -70,7 +81,7 @@ namespace TestTcpServer
 
         }
 
-        public override void OnDisconnected(Session session)
+        public override void OnDisconnected(INetSession session)
         {
             var rrt = rrts[session.GetId()];
 
@@ -96,7 +107,7 @@ namespace TestTcpServer
             Console.WriteLine(string.Format("[{0}]连接关闭！", session.GetId()));
         }
 
-        public override void OnMessageReceived(Session session, byte[] data)
+        public override void OnMessageReceived(INetSession session, byte[] data)
         {
             var msg = MessagePack.MessagePackSerializer.Deserialize<MsgDelayTest>(data);
 
@@ -115,7 +126,7 @@ namespace TestTcpServer
             throw new NotImplementedException();
         }
 
-        private bool RandomClose(Session client)
+        private bool RandomClose(INetSession client)
         {
             if (Utils.IClock() % 10001 == 1)
             {

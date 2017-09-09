@@ -45,12 +45,12 @@ namespace Server
             throw new NotImplementedException();
         }
 
-        public override void OnDisconnected(Session session)
+        public override void OnDisconnected(INetSession session)
         {
             throw new NotImplementedException();
         }
 
-        public override void OnMessageReceived(Session session, byte[] data)
+        public override void OnMessageReceived(INetSession session, byte[] data)
         {
             throw new NotImplementedException();
         }

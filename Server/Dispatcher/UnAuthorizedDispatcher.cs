@@ -24,12 +24,12 @@ namespace Server
             throw new NotImplementedException();
         }
 
-        public override void OnDisconnected(Session session)
+        public override void OnDisconnected(INetSession session)
         {
             Console.Write(string.Format("session[{0}]关闭了！", session?.GetId()));
         }
 
-        public override void OnMessageReceived(Session session, byte[] data)
+        public override void OnMessageReceived(INetSession session, byte[] data)
         {
             session.SendMessage(data);
         }
