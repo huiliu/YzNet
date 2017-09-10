@@ -30,7 +30,7 @@ namespace Server
             socket.ReceiveBufferSize = 1;
 
             recvSAEA      = new SocketAsyncEventArgs();
-            recvBuffer = new ByteBuffer(MessageHeader.MessageMaxLength);
+            recvBuffer = new ByteBuffer(1024 * 16);
 
             isSending     = false;
             sendSAEA      = new SocketAsyncEventArgs();
@@ -103,6 +103,13 @@ namespace Server
             if (!IsConnected || !CanReceive)
             {
                 // Session状态不满足
+                return;
+            }
+
+            if (e.BytesTransferred == 0 && e.SocketError == SocketError.WouldBlock)
+            {
+                // socket当前无法完成操作，重试之
+                startReceive();
                 return;
             }
 
