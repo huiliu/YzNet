@@ -24,7 +24,6 @@ namespace Server
             this.socket   = socket;
 
             // 设置socket参数
-            socket.Blocking          = false;
             socket.NoDelay           = true;
             socket.SendBufferSize    = 1;
             socket.ReceiveBufferSize = 1;

@@ -48,7 +48,6 @@ namespace Server
                 socket = new Socket(SocketType.Dgram, ProtocolType.Udp);
                 socket.Connect(IPAddress.Parse(host), port);
 
-                socket.Blocking          = false;
                 socket.SendBufferSize    = NetworkCommon.UdpSendBuffer;
                 socket.ReceiveBufferSize = NetworkCommon.UdpRecvBuffer;
 

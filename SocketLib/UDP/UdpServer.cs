@@ -48,7 +48,6 @@ namespace YezhStudio.Base.Network
             socket = new Socket(address.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
             socket.Bind(new IPEndPoint(address, port));
 
-            socket.Blocking          = false;
             socket.SendBufferSize    = NetworkCommon.UdpSendBuffer;
             socket.ReceiveBufferSize = NetworkCommon.UdpRecvBuffer;
 

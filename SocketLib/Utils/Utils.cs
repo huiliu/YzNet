@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
+using NLog;
 
 namespace YezhStudio.Base.Network
 {
     public static class Utils
     {
+        public static Logger logger = LogManager.GetCurrentClassLogger();
+
         private static readonly DateTime utc_time = new DateTime(1970, 1, 1);
 
         public static UInt32 IClock()

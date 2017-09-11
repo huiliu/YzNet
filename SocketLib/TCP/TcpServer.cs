@@ -45,13 +45,13 @@ namespace YezhStudio.Base.Network
                 socket.Listen (100);
                 socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
 
-                MainLog.Instance.Info("[{0}]服务启动成功！开始接受连接", name);
+                Utils.logger.Info("[{0}]服务启动成功！开始接受连接", name);
 
                 startAcceptConnection();
             }
             catch (Exception e)
             {
-                MainLog.Instance.Error(string.Format("Server[{0}]failed to start!\nMessage: {1}\nStackTrace: {2}", name, e.Message, e.StackTrace), "Server");
+                Utils.logger.Error(string.Format("Server[{0}]failed to start!\nMessage: {1}\nStackTrace: {2}", name, e.Message, e.StackTrace), "Server");
                 return;
             }
         }
@@ -97,7 +97,7 @@ namespace YezhStudio.Base.Network
             }
             catch (Exception e)
             {
-                MainLog.Instance.Error(string.Format("Server[{0}]failed to start!\nMessage: {1}\nStackTrace: {2}", name, e.Message, e.StackTrace), "Server");
+                Utils.logger.Error(string.Format("Server[{0}]failed to start!\nMessage: {1}\nStackTrace: {2}", name, e.Message, e.StackTrace), "Server");
                 isClosed = true;
                 return;
             }
@@ -123,7 +123,7 @@ namespace YezhStudio.Base.Network
             }
             catch (Exception err)
             {
-                MainLog.Instance.Error(string.Format("[{0}]处理接收新连接失败!\nMessage: {1}\nStackTrace: {2}", name, err.Message, err.StackTrace), "Server");
+                Utils.logger.Error(string.Format("[{0}]处理接收新连接失败!\nMessage: {1}\nStackTrace: {2}", name, err.Message, err.StackTrace), "Server");
             }
             finally
             {

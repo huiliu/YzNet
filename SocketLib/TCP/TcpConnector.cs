@@ -105,7 +105,7 @@ namespace YezhStudio.Base.Network
             }
             catch (Exception e)
             {
-                MainLog.Instance.Error(string.Format("连接远程服务器出错！\nMessage: {0}\nStackTrace: {1}\n", e.Message, e.StackTrace), "Connector");
+                Utils.logger.Error(string.Format("连接远程服务器出错！\nMessage: {0}\nStackTrace: {1}\n", e.Message, e.StackTrace), "Connector");
             }
         }
 

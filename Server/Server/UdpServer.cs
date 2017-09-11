@@ -52,7 +52,6 @@ namespace Server
             socket = new Socket(address.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
             socket.Bind(new IPEndPoint(address, cfg.Port));
 
-            socket.Blocking          = false;
             socket.SendBufferSize    = 1024 * 32;
             socket.ReceiveBufferSize = 1024 * 32;
 
