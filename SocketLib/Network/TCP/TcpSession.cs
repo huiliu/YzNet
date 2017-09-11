@@ -110,11 +110,21 @@ namespace YezhStudio.Base.Network
             recvBuffer.MoveWriteIndex(e.BytesTransferred);
 
             // 尝试解析并分发消息
+            int msgID = -1;
+            int cookie;
             byte[] msg = null;
-            while ((msg = MessageHeader.TryDecode(recvBuffer)) != null)
+
+            try
             {
-                ++statistics.RecvPacketCount;
-                triggerMessageReceived(this, msg);
+                while ((msg = MessageHeader.TryDecode(recvBuffer, out msgID, out cookie)) != null)
+                {
+                    ++statistics.RecvPacketCount;
+                    triggerMessageReceived(this, msgID, msg);
+                }
+            }
+            catch (Exception err)
+            {
+                Utils.logger.Error(string.Format("处理消息[{0}]出错！Message: {1}\nStackTrace: {2}", msgID, err.Message, err.StackTrace), ToString());
             }
 
             // 尝试调整Buffer
@@ -127,17 +137,17 @@ namespace YezhStudio.Base.Network
 
         #region 发送网络消息
         // 发送Buffer
-        public override void SendMessage(byte[] data)
+        public override void SendMessage(int msgID, ByteBuffer data)
         {
-            sendMessageImpl(data);
+            sendMessageImpl(msgID, data);
         }
 
         // 发送Buffer
-        private void sendMessageImpl(byte[] data)
+        private void sendMessageImpl(int msgID, ByteBuffer data)
         {
             ++statistics.SendPacketCount;
             // 添加消息头
-            var buff = MessageHeader.Encoding(data);
+            var buff = MessageHeader.Encoding(msgID, data);
 
             lock(toBeSendQueue)
             {
@@ -146,7 +156,7 @@ namespace YezhStudio.Base.Network
                     ++statistics.SendByQueue;
 
                     // 正在发送中，写入发送队列
-                    toBeSendQueue.Enqueue(new ArraySegment<byte>(buff));
+                    toBeSendQueue.Enqueue(new ArraySegment<byte>(buff.Buffer));
                     if (toBeSendQueue.Count >= NetworkCommon.MaxCacheMessage)
                     {
                         // 消息缓存数超过上限
@@ -161,7 +171,7 @@ namespace YezhStudio.Base.Network
             }
 
             // 直接发送
-            var sendQueue = new SendingQueue(buff);
+            var sendQueue = new SendingQueue(buff.Buffer);
             sendToSocket(sendQueue);
        }
 

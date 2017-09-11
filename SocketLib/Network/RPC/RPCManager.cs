@@ -26,18 +26,18 @@ namespace YezhStudio.Base.Network
         }
 
         // 发送Rpc请求，不关注结果
-        public void RpcPost(RpcSession session, byte[] data)
+        public void RpcPost(RpcSession session, int MsgID, ByteBuffer data)
         {
-            session.SendMessage(data);
+            session.SendMessage(MsgID, data);
         }
 
         // 发送Rpc请求，同步等待结果
-        public byte[] RpcSend(RpcSession session, byte[] data, int timeout)
+        public byte[] RpcSend(RpcSession session, int MsgID, ByteBuffer data, int timeout)
         {
             var ev = new AutoResetEvent(false);
             byte[] ret = null;
 
-            RpcSendAsync(session, data, delegate (bool result, byte[] response)
+            RpcSendAsync(session, MsgID, data, delegate (bool result, byte[] response)
             {
                 ret = response;
                 ev.Set();
@@ -49,7 +49,7 @@ namespace YezhStudio.Base.Network
         }
 
         // 发送Rpc请求，异步处理结果
-        public void RpcSendAsync(RpcSession session, byte[] data, RpcResponseCallback cb, int timeout)
+        public void RpcSendAsync(RpcSession session, int MsgID, ByteBuffer data, RpcResponseCallback cb, int timeout)
         {
             var request = new RpcRequestInfo();
             request.RequestID = getCookie();
@@ -61,7 +61,7 @@ namespace YezhStudio.Base.Network
                 reqDict[request.RequestID] = request;
             }
 
-            session.SendMessage(RpcRequest.Encode(request.RequestID, data));
+            session.SendMessage(MsgID, data);
         }
 
         // 处理收到的RPC结果

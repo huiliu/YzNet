@@ -9,7 +9,7 @@ namespace YezhStudio.Base.Network
     public abstract class INetSession
     {
         public static event Action<INetSession> OnSessionClosed;
-        public static event Action<INetSession, byte[]> OnMessageReceived;
+        public static event Action<INetSession, int, byte[]> OnMessageReceived;
 
         public uint SessionID { get; set; }
 
@@ -36,16 +36,16 @@ namespace YezhStudio.Base.Network
         }
 
         // 发到消息的事件
-        protected void triggerMessageReceived(INetSession session, byte[] data)
+        protected void triggerMessageReceived(INetSession session, int msgID, byte[] data)
         {
             if (OnMessageReceived != null)
             {
-                OnMessageReceived.Invoke(session, data);
+                OnMessageReceived.Invoke(session, msgID, data);
             }
         }
 
         // 向对端发送buffer
-        public abstract void SendMessage(byte[] buffer);
+        public abstract void SendMessage(int msgID, ByteBuffer buffer);
 
         // 开始接收数据
         public abstract void startReceive();

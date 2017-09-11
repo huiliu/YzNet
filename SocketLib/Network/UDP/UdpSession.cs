@@ -23,6 +23,7 @@ namespace YezhStudio.Base.Network
             SessionID      = conv;
             remoteEndPoint = clientEndPoint;
             IsConnected    = true;
+            recvBuffer     = new ByteBuffer(NetworkCommon.UdpRecvBuffer);
 
             nextUpdateTimeMs = Utils.IClock();
 
@@ -38,6 +39,8 @@ namespace YezhStudio.Base.Network
                     // 将KCP中消息通过UDP Server发送给目标
                     byte[] b = new byte[sz];
                     Array.Copy(buff, 0, b, 0, sz);
+
+                    // 发送到网络
                     server.SendMessage(b, remoteEndPoint);
                 }
                 catch (Exception e)
@@ -84,7 +87,7 @@ namespace YezhStudio.Base.Network
         }
 
         // 发送网络消息
-        public override void SendMessage(byte[] buffer)
+        public override void SendMessage(int msgID, ByteBuffer buffer)
         {
             lock(kcp)
             {
@@ -96,8 +99,11 @@ namespace YezhStudio.Base.Network
                     return;
                 }
 
+                // 打包消息
+                var data = MessageHeader.Encoding(msgID, buffer);
+
                 // 将消息交给KCP
-                int ret = kcp.Send(buffer);
+                int ret = kcp.Send(data.Buffer);
                 Debug.Assert(ret == 0, "Send Data to KCP Failed!", "UDP");
 
                 kcp.Flush();
@@ -119,13 +125,6 @@ namespace YezhStudio.Base.Network
             checkReceiveKcpMessage();
         }
 
-        // 检查异常原因，关闭会话
-        private void shouldBeClose(Exception e)
-        {
-            Console.WriteLine("捕捉到异常！Message: {0}\nStackTrace: {1}\n", e.Message, e.StackTrace);
-            Close();
-        }
-
         // 检查KCP是否有消息需要处理
         private void checkReceiveKcpMessage()
         {
@@ -137,11 +136,42 @@ namespace YezhStudio.Base.Network
                     byte[] b = new byte[sz];
                     if (kcp.Recv(b) > 0)
                     {
-                        // 将消息分发
-                        triggerMessageReceived(this, b);
+                        // 处理收到的消息
+                        processReceivedMessage(b);
                     }
                 }
             }
+        }
+
+        private void processReceivedMessage(byte[] buff)
+        {
+            recvBuffer.WriteBytes(buff);
+
+            int msgID = -1;
+            int cookie;
+            byte[] msg = null;
+
+            try
+            {
+                while ((msg = MessageHeader.TryDecode(recvBuffer, out msgID, out cookie)) != null)
+                {
+                    // 将消息分发
+                    triggerMessageReceived(this, msgID, msg);
+                }
+            }
+            catch (Exception e)
+            {
+                Utils.logger.Error(string.Format("处理消息[{0}]出错！Message: {1}\nStackTrace: {2}", msgID, e.Message, e.StackTrace), ToString());
+            }
+
+            recvBuffer.TryDefragment();
+        }
+
+        // 检查异常原因，关闭会话
+        private void shouldBeClose(Exception e)
+        {
+            Console.WriteLine("捕捉到异常！Message: {0}\nStackTrace: {1}\n", e.Message, e.StackTrace);
+            Close();
         }
 
         // 定时调用
@@ -167,6 +197,7 @@ namespace YezhStudio.Base.Network
 
         private EndPoint remoteEndPoint;
         private UdpServer server;
+        private ByteBuffer recvBuffer;
 
         #region KCP相关
         private uint conv;

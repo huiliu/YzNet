@@ -44,29 +44,45 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Common\ByteBuffer.cs" />
-    <Compile Include="Common\INetSession.cs" />
-    <Compile Include="Common\kcp.cs" />
-    <Compile Include="Common\MessageDispatcher.cs" />
-    <Compile Include="Common\MessageHeader.cs" />
-    <Compile Include="Common\NetworkCommon.cs" />
+    <Compile Include="7zip\Common\CommandLineParser.cs" />
+    <Compile Include="7zip\Common\CRC.cs" />
+    <Compile Include="7zip\Common\InBuffer.cs" />
+    <Compile Include="7zip\Common\OutBuffer.cs" />
+    <Compile Include="7zip\Compress\LZMA\LzmaBase.cs" />
+    <Compile Include="7zip\Compress\LZMA\LzmaDecoder.cs" />
+    <Compile Include="7zip\Compress\LZMA\LzmaEncoder.cs" />
+    <Compile Include="7zip\Compress\LZ\IMatchFinder.cs" />
+    <Compile Include="7zip\Compress\LZ\LzBinTree.cs" />
+    <Compile Include="7zip\Compress\LZ\LzInWindow.cs" />
+    <Compile Include="7zip\Compress\LZ\LzOutWindow.cs" />
+    <Compile Include="7zip\Compress\RangeCoder\RangeCoder.cs" />
+    <Compile Include="7zip\Compress\RangeCoder\RangeCoderBit.cs" />
+    <Compile Include="7zip\Compress\RangeCoder\RangeCoderBitTree.cs" />
+    <Compile Include="7zip\ICoder.cs" />
+    <Compile Include="Network\Common\ByteBuffer.cs" />
+    <Compile Include="Network\Common\INetSession.cs" />
+    <Compile Include="Network\Common\kcp.cs" />
+    <Compile Include="Network\Common\MessageDispatcher.cs" />
+    <Compile Include="Network\Common\MessageHeader.cs" />
+    <Compile Include="Network\Common\NetworkCommon.cs" />
+    <Compile Include="Network\RPC\Handler\RpcRequest.cs" />
+    <Compile Include="Network\RPC\Handler\RpcResponse.cs" />
+    <Compile Include="Network\RPC\RPCManager.cs" />
+    <Compile Include="Network\RPC\RpcSession.cs" />
+    <Compile Include="Network\TCP\TcpConnector.cs" />
+    <Compile Include="Network\TCP\TcpServer.cs" />
+    <Compile Include="Network\TCP\TcpSession.cs" />
+    <Compile Include="Network\UDP\ReliableUdpClient.cs" />
+    <Compile Include="Network\UDP\UdpServer.cs" />
+    <Compile Include="Network\UDP\UdpSession.cs" />
+    <Compile Include="Network\Utils\NetStatistics.cs" />
+    <Compile Include="Network\Utils\Utils.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="RPC\Handler\RpcRequest.cs" />
-    <Compile Include="RPC\Handler\RpcResponse.cs" />
-    <Compile Include="RPC\RPCManager.cs" />
-    <Compile Include="RPC\RpcSession.cs" />
-    <Compile Include="TCP\TcpConnector.cs" />
-    <Compile Include="TCP\TcpServer.cs" />
-    <Compile Include="TCP\TcpSession.cs" />
-    <Compile Include="UDP\ReliableUdpClient.cs" />
-    <Compile Include="UDP\UdpServer.cs" />
-    <Compile Include="UDP\UdpSession.cs" />
-    <Compile Include="Utils\NetStatistics.cs" />
-    <Compile Include="Utils\Utils.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

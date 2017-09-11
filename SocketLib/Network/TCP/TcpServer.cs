@@ -11,10 +11,10 @@ namespace YezhStudio.Base.Network
     public class TcpServer : IDisposable
     {
         // 侦听服务关闭
-        public event Action          OnServerClosed;
+        public event Action                 OnServerClosed;
 
         // 处理新进入的连接
-        public event Action<INetSession>  OnNewConnection;
+        public event Action<INetSession>    OnNewConnection;
 
         public TcpServer(string name)
         {
@@ -76,16 +76,12 @@ namespace YezhStudio.Base.Network
         public void Dispose()
         {
             acceptSAEA.Dispose();
+            socket.Dispose();
         }
 
         // 接收新连接进入
         private void startAcceptConnection()
         {
-            if (isClosed)
-            {
-                return;
-            }
-
             try
             {
                 acceptSAEA.AcceptSocket = null;
@@ -106,6 +102,12 @@ namespace YezhStudio.Base.Network
         // 接收新连接回调
         private void onAcceptCompleted(object sender, SocketAsyncEventArgs e)
         {
+            if (isClosed)
+            {
+                Utils.logger.Info(string.Format("服务[{0}]已经关闭！", name), ToString());
+                return;
+            }
+
             if (e.SocketError != SocketError.Success)
             {
                 Stop();
@@ -118,6 +120,7 @@ namespace YezhStudio.Base.Network
             {
                 if(OnNewConnection != null)
                 {
+                    // 处理新连接
                     OnNewConnection.Invoke(new TcpSession(e.AcceptSocket));
                 }
             }
@@ -127,6 +130,7 @@ namespace YezhStudio.Base.Network
             }
             finally
             {
+                // 继续侦听
                 startAcceptConnection();
             }
         }

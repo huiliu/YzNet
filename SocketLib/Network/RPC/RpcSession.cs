@@ -8,7 +8,7 @@ namespace YezhStudio.Base.Network
     {
         public RpcSession(RpcManager mgr)
         {
-
+            this.rpcMgr = mgr;
         }
 
         public void Close()
@@ -16,34 +16,34 @@ namespace YezhStudio.Base.Network
             session.Close();
         }
 
-        public void SendMessage(byte[] data)
+        public void SendMessage(int MsgID, ByteBuffer data)
         {
             Debug.Assert(session != null, "RpcSession 错误！没有连接对象", "RPC");
             if (session != null)
             {
-                session.SendMessage(data);
+                session.SendMessage(MsgID, data);
             }
         }
 
         // 发送Rpc请求，不关注结果
-        public void RpcPost(byte[] data)
+        public void RpcPost(int MsgID, ByteBuffer data)
         {
-            mgr.RpcPost(this, data);   
+            rpcMgr.RpcPost(this, MsgID, data);   
         }
 
         // 发送Rpc请求，同步等待结果
-        public byte[] RpcSend(byte[] data, int timeout = 1000 * 5)
+        public byte[] RpcSend(int MsgID, ByteBuffer data, int timeout = 1000 * 5)
         {
-            return mgr.RpcSend(this, data, timeout);
+            return rpcMgr.RpcSend(this, MsgID, data, timeout);
         }
 
         // 发送Rpc请求，异步处理结果
-        public void RpcSendAsync(byte[] data, RpcResponseCallback cb, int timeout = 1000 * 5)
+        public void RpcSendAsync(int MsgID, ByteBuffer data, RpcResponseCallback cb, int timeout = 1000 * 5)
         {
-            mgr.RpcSendAsync(this, data, cb, timeout);
+            rpcMgr.RpcSendAsync(this, MsgID, data, cb, timeout);
         }
 
-        private RpcManager mgr;
+        private RpcManager rpcMgr;
         private INetSession session;
     }
 }

@@ -10,16 +10,17 @@ namespace YezhStudio.Base.Network
     // 集成KCP功能的UDP客户端
     public class ReliableUdpClient : IDisposable
     {
-        public event Action<ReliableUdpClient>                     OnConnected;        // 连接建立成功回调
-        public event Action<ReliableUdpClient, byte[], int, int>   OnMessageReceived;  // 收到数据回调
-        public event Action<ReliableUdpClient>                     OnDisconnected;     // 连接断开回调
+        public event Action<ReliableUdpClient>              OnConnected;        // 连接建立成功回调
+        public event Action<ReliableUdpClient, int, byte[]> OnMessageReceived;  // 收到数据回调
+        public event Action<ReliableUdpClient>              OnDisconnected;     // 连接断开回调
 
         public ReliableUdpClient(UInt32 conv)
         {
             this.conv = conv;
             isConnected = false;
 
-            recvBuffer = new byte[NetworkCommon.UdpRecvBuffer];
+            recvData = new byte[NetworkCommon.UdpRecvBuffer];
+            recvBuffer = new ByteBuffer(NetworkCommon.MaxPackageSize);
             recvSAEA = new SocketAsyncEventArgs();
             recvSAEA.Completed += onRecvCompleted;
 
@@ -36,6 +37,31 @@ namespace YezhStudio.Base.Network
                 kcp.WndSize(NetworkCommon.KcpSendWnd, NetworkCommon.KcpRecvWnd);
             }
 
+        }
+
+        public void Dispose()
+        {
+            recvSAEA.Dispose();
+            sendSAEA.Dispose();
+            
+            toBeSendQueue.Clear();
+            socket.Dispose();
+        }
+
+        public void Close()
+        {
+            recvSAEA.Completed -= onRecvCompleted;
+            sendSAEA.Completed -= onSendCompleted;
+
+            isConnected = false;
+            socket.Close();
+
+            OnDisconnected?.Invoke(this);
+        }
+
+        public uint GetID()
+        {
+            return conv;
         }
 
         // 连接服务器
@@ -63,46 +89,34 @@ namespace YezhStudio.Base.Network
             }
         }
 
-        public void Dispose()
-        {
-            recvSAEA.Dispose();
-            sendSAEA.Dispose();
-            
-            toBeSendQueue.Clear();
-            // socket.Dispose();
-        }
-
-        public void Close()
-        {
-            recvSAEA.Completed -= onRecvCompleted;
-            sendSAEA.Completed -= onSendCompleted;
-
-            isConnected = false;
-            socket.Close();
-
-            if (OnDisconnected != null)
-            {
-                OnDisconnected.Invoke(this);
-            }
-        }
-
-        public uint GetID()
-        {
-            return conv;
-        }
-
         public void Update()
         {
-
             if (isConnected)
             {
                 kcpUpdate(Utils.IClock());
             }
         }
+
+        // KCP定时Update
+        private void kcpUpdate(UInt32 currentMs)
+        {
+            if (currentMs >= nextUpdateTimeMs)
+            {
+                lock(kcp)
+                {
+                    kcp.Update(currentMs);
+                    nextUpdateTimeMs = kcp.Check(currentMs);
+                }
+
+                checkKcpReceiveMessage();
+            }
+        }
+
         #region 接收消息
+        // 开始接收网络消息
         private void startReceive()
         {
-            recvSAEA.SetBuffer(recvBuffer, 0, recvBuffer.Length);
+            recvSAEA.SetBuffer(recvData, 0, recvData.Length);
 
             try
             {
@@ -130,16 +144,17 @@ namespace YezhStudio.Base.Network
                 return;
             }
 
-            // TODO: 优化
-            recvData = new ArraySegment<byte>(e.Buffer, e.Offset, e.BytesTransferred);
-            OnReceiveMessage(recvData.Array);
+            byte[] data = new byte[e.BytesTransferred];
+            Array.Copy(e.Buffer, 0, data, 0, e.BytesTransferred);
+
+            onReceiveMessage(data);
 
             // 继续收取
             startReceive();
         }
 
         // "处理"收到的网络消息
-        private void OnReceiveMessage(byte[] buff)
+        private void onReceiveMessage(byte[] buff)
         {
             lock(kcp)
             {
@@ -150,9 +165,11 @@ namespace YezhStudio.Base.Network
                 kcp.Flush();
             }
 
+            // 检查是否有KCP消息收取
             checkKcpReceiveMessage();
         }
 
+        // 检查是否有KCP消息收取
         private void checkKcpReceiveMessage()
         {
             lock(kcp)
@@ -160,23 +177,45 @@ namespace YezhStudio.Base.Network
                 // 读取KCP中的消息
                 for (var sz = kcp.PeekSize(); sz > 0; sz = kcp.PeekSize())
                 {
-                    if (OnMessageReceived != null)
+                    byte[] b = new byte[sz];
+                    if (kcp.Recv(b) > 0)
                     {
-                        byte[] b = new byte[sz];
-                        if (kcp.Recv(b) > 0)
-                        {
-                            // 将消息分发
-                            OnMessageReceived.Invoke(this, b, 0, sz);
-                        }
+                        // 将消息分发
+                        processReceivedMessage(b);
                     }
                 }
             }
         }
+
+        // 处理收到的KCP消息
+        private void processReceivedMessage(byte[] data)
+        {
+            recvBuffer.WriteBytes(data);
+
+            int msgID = -1;
+            int cookie;
+            byte[] msg = null;
+
+            try
+            {
+                while ((msg = MessageHeader.TryDecode(recvBuffer, out msgID, out cookie)) != null)
+                {
+                    // 将消息分发
+                    OnMessageReceived?.Invoke(this, msgID, msg);
+                }
+            }
+            catch (Exception e)
+            {
+                Utils.logger.Error(string.Format("处理消息[{0}]出错！Message: {1}\nStackTrace: {2}", msgID, e.Message, e.StackTrace), ToString());
+            }
+
+            recvBuffer.TryDefragment();
+        }
         #endregion
 
         #region 发送消息
-        // 发送消息
-        public void SendMessage(byte[] buff)
+        // 发送消息(至KCP)
+        public void SendMessage(int MsgID, ByteBuffer data)
         {
             lock(kcp)
             {
@@ -188,8 +227,11 @@ namespace YezhStudio.Base.Network
                     return;
                 }
 
+                // 添加消息头
+                var buff = MessageHeader.Encoding(MsgID, data);
+
                 // 交给KCP
-                int ret = kcp.Send(buff);
+                int ret = kcp.Send(buff.Buffer);
                 Debug.Assert(ret == 0, "Send Data into KCP Failed", this.ToString());
 
                 kcp.Flush();
@@ -204,7 +246,9 @@ namespace YezhStudio.Base.Network
                 // 将KCP消息发送给服务器
                 byte[] b = new byte[size];
                 Array.Copy(data, 0, b, 0, size);
-                sendMessageImpl(b);
+
+                // 发送至网络
+                sendToPeer(b);
             }
             catch (Exception e)
             {
@@ -212,19 +256,18 @@ namespace YezhStudio.Base.Network
             }
         }
 
-        // 发送Buffer
-        private void sendMessageImpl(byte[] data)
+        // 发送Buffer网络
+        private void sendToPeer(byte[] buff)
         {
-            ++statistics.SendPacketCount;
-            // 添加消息头
-            var buff = MessageHeader.Encoding(data);
+            if (!isConnected)
+            {
+                return;
+            }
 
             lock(toBeSendQueue)
             {
                 if (isSending)
                 {
-                    ++statistics.SendByQueue;
-
                     // 正在发送中，写入发送队列
                     toBeSendQueue.Enqueue(new ArraySegment<byte>(buff));
                     if (toBeSendQueue.Count >= NetworkCommon.MaxCacheMessage)
@@ -254,7 +297,6 @@ namespace YezhStudio.Base.Network
                 sendSAEA.SetBuffer(null, 0, 0);
                 sendSAEA.BufferList = queue;
 
-                ++statistics.CallSendAsyncCount;
                 var ret = socket.SendAsync(sendSAEA);
                 if (!ret)
                 {
@@ -282,16 +324,14 @@ namespace YezhStudio.Base.Network
                 return;
             }
 
-            if (e.SocketError != SocketError.Success)
+            if (e.BytesTransferred <= 0 || e.SocketError != SocketError.Success)
             {
                 Close();
                 return;
             }
 
-            Console.WriteLine("sendMessage: {0}bytes", e.BytesTransferred);
             if (srcQueue.Trim(e.BytesTransferred))
             {
-                statistics.TotalSendBytes += e.BytesTransferred;
                 // 全部发送完毕
 
                 ArraySegment<byte>[] arr;
@@ -461,28 +501,11 @@ namespace YezhStudio.Base.Network
             Close();
         }
 
-        // KCP定时Update
-        private void kcpUpdate(UInt32 currentMs)
-        {
-            if (currentMs >= nextUpdateTimeMs)
-            {
-                lock(kcp)
-                {
-                    kcp.Update(currentMs);
-
-                    nextUpdateTimeMs = kcp.Check(currentMs);
-                }
-
-                checkKcpReceiveMessage();
-                //Console.WriteLine("Kcp Update: {0}, NextTime: {1}", Utils.IClock(), nextUpdateTimeMs);
-            }
-        }
-
         private bool   isConnected;
         private Socket socket;
 
-        private byte[]               recvBuffer;
-        private ArraySegment<byte>   recvData;
+        private byte[]               recvData;
+        private ByteBuffer           recvBuffer;
         private SocketAsyncEventArgs recvSAEA;
 
         private bool isSending;
@@ -494,7 +517,5 @@ namespace YezhStudio.Base.Network
         private KCP     kcp;
         private UInt32  nextUpdateTimeMs;
         #endregion
-
-        private NetStatistics statistics;
     }
 }

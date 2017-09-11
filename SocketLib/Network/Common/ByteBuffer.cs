@@ -7,7 +7,7 @@ namespace YezhStudio.Base.Network
 {
     public class ByteBuffer
     {
-        const int kCheapPrepend = 8;
+        const int kCheapPrepend = 12;
         const int kInitialSize = 1024;
 
         private byte[] buffer;
