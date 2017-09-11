@@ -27,8 +27,8 @@ namespace TestTcpServer
             server.OnNewConnection += TcpSessionMgr.Instance.HandleNewSession;
             server.StartServiceOn(cfg);
 
-            startClient(1);
-
+            // startClient(1);
+            Console.WriteLine("服务启动成功！");
             CommandDispatcher.Instance.Start();
         }
 
@@ -109,16 +109,18 @@ namespace TestTcpServer
 
         public override void OnMessageReceived(INetSession session, byte[] data)
         {
-            var msg = MessagePack.MessagePackSerializer.Deserialize<MsgDelayTest>(data);
+            Console.WriteLine(string.Format("received message: {0}", BitConverter.ToSingle(data, 0)));
+            session.SendMessage(data);
+            //var msg = MessagePack.MessagePackSerializer.Deserialize<MsgDelayTest>(data);
 
-            var delay = Utils.IClock() - msg.ClientSendTime;
-            rrts[session.GetId()].Add(delay);
+            //var delay = Utils.IClock() - msg.ClientSendTime;
+            //rrts[session.GetId()].Add(delay);
 
-            Console.WriteLine("RRT: {0}", delay);
+            //Console.WriteLine("RRT: {0}", delay);
 
-            msg.ClientSendTime = Utils.IClock();
-            var buff = MessagePackSerializer.Serialize(msg);
-            session.SendMessage(buff);
+            //msg.ClientSendTime = Utils.IClock();
+            //var buff = MessagePackSerializer.Serialize(msg);
+            //session.SendMessage(buff);
         }
 
         public override void Start()
