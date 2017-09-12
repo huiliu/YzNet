@@ -72,11 +72,6 @@ namespace YezhStudio.Base.Network
             base.Close();
         }
 
-        public void Shutdown()
-        {
-            Close();
-        }
-
         // KCP更新
         public void Update()
         {
@@ -86,6 +81,7 @@ namespace YezhStudio.Base.Network
             }
         }
 
+        #region 发送数据
         // 发送网络消息
         public override void SendMessage(int msgID, ByteBuffer buffer)
         {
@@ -109,7 +105,9 @@ namespace YezhStudio.Base.Network
                 kcp.Flush();
             }
         }
+        #endregion
 
+        #region 接收数据
         // "处理"收到的网络消息
         public void OnReceiveMessage(byte[] buff)
         {
@@ -166,6 +164,7 @@ namespace YezhStudio.Base.Network
 
             recvBuffer.TryDefragment();
         }
+        #endregion
 
         // 检查异常原因，关闭会话
         private void shouldBeClose(Exception e)

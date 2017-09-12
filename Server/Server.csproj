@@ -81,7 +81,6 @@
     <Compile Include="Message\MsgPong.cs" />
     <Compile Include="Message\MsgRPCResponse.cs" />
     <Compile Include="Message\MsgUdpKey.cs" />
-    <Compile Include="RPC\RPCService.cs" />
     <Compile Include="Server\UdpServer.cs" />
     <Compile Include="Session\TcpSessionMgr.cs" />
     <Compile Include="Dispatcher\MessageDispatcher.cs" />

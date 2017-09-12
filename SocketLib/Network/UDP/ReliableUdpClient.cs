@@ -131,6 +131,7 @@ namespace YezhStudio.Base.Network
             }
         }
 
+        // 异步接收数据返回
         private void onRecvCompleted(object sender, SocketAsyncEventArgs e)
         {
             if (!isConnected)
@@ -190,6 +191,7 @@ namespace YezhStudio.Base.Network
         // 处理收到的KCP消息
         private void processReceivedMessage(byte[] data)
         {
+            // 将收到的数据写入到接收缓存
             recvBuffer.WriteBytes(data);
 
             int msgID = -1;
@@ -198,6 +200,7 @@ namespace YezhStudio.Base.Network
 
             try
             {
+                // 尝试解码消息
                 while ((msg = MessageHeader.TryDecode(recvBuffer, out msgID, out cookie)) != null)
                 {
                     // 将消息分发
@@ -217,6 +220,9 @@ namespace YezhStudio.Base.Network
         // 发送消息(至KCP)
         public void SendMessage(int MsgID, ByteBuffer data)
         {
+            // 添加消息头
+            var buff = MessageHeader.Encoding(MsgID, data);
+
             lock(kcp)
             {
                 // TODO: 需要调优
@@ -226,9 +232,6 @@ namespace YezhStudio.Base.Network
                     Close();
                     return;
                 }
-
-                // 添加消息头
-                var buff = MessageHeader.Encoding(MsgID, data);
 
                 // 交给KCP
                 int ret = kcp.Send(buff.Buffer);
