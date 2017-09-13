@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace YezhStudio.Base.Network
+namespace Base.Network
 {
     // |01234567|01234567|01234567|01234567|
     // |             RequesID              |  -> RPC响应头(只包含一个请求ID)

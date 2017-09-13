@@ -3,7 +3,7 @@
 // KCP 优化
 // 根据讨论https://github.com/skywind3000/kcp/issues/10将flush接口调整为public，以便于每次发送后调用
 
-namespace YezhStudio.Base.Network
+namespace Base.Network
 {
 public class KCP
 {

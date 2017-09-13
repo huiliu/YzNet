@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 
-namespace YezhStudio.Base.Network
+namespace Base.Network
 {
     // |01234567|01234567|01234567|01234567|
     // |SYNCODE1|SYNCODE2|    CtrlCode     | <--- Message Header(消息长度不包含消息头, 12字节: 1 + 1 + 1 + 1 + 4 + 2 + 2)

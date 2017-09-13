@@ -3,7 +3,7 @@ using System.Diagnostics;
 
 // 参考https://github.com/chenshuo/muduo中Buffer的实现
 
-namespace YezhStudio.Base.Network
+namespace Base.Network
 {
     public class ByteBuffer
     {

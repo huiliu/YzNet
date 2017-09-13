@@ -2,7 +2,7 @@
 using System.Diagnostics;
 using System.Collections.Generic;
 
-namespace YezhStudio.Base.Network
+namespace Base.Network
 {
     // 消息分发器
     public abstract class IMessageDispatcher

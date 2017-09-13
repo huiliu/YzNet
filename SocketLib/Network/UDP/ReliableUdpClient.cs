@@ -5,7 +5,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 
-namespace YezhStudio.Base.Network
+namespace Base.Network
 {
     // 集成KCP功能的UDP客户端
     public class ReliableUdpClient : IDisposable
@@ -65,15 +65,13 @@ namespace YezhStudio.Base.Network
         }
 
         // 连接服务器
-        public void Connect(string host, int port)
+        public void Connect(IPAddress address, int port)
         {
             try
             {
-                // TODO: IPV6
                 // 连接UDP服务器
-                // socket = new Socket(SocketType.Dgram, ProtocolType.Udp);
-                socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-                socket.Connect(IPAddress.Parse(host), port);
+                socket = new Socket(address.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
+                socket.Connect(address, port);
 
                 socket.SendBufferSize    = NetworkCommon.UdpSendBuffer;
                 socket.ReceiveBufferSize = NetworkCommon.UdpRecvBuffer;

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 
-namespace YezhStudio.Base.Network
+namespace Base.Network
 {
     public delegate void RpcResponseCallback(bool result, byte[] data);
 

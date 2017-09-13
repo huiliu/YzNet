@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 
-namespace YezhStudio.Base.Network
+namespace Base.Network
 {
     // TCP服务器，侦听网络商品，接受新进入的连接
     // TODO:

@@ -60,6 +60,7 @@
     <Compile Include="7zip\Compress\RangeCoder\RangeCoderBitTree.cs" />
     <Compile Include="7zip\ICoder.cs" />
     <Compile Include="Network\Common\ByteBuffer.cs" />
+    <Compile Include="Network\Common\DNS.cs" />
     <Compile Include="Network\Common\INetSession.cs" />
     <Compile Include="Network\Common\kcp.cs" />
     <Compile Include="Network\Common\MessageDispatcher.cs" />

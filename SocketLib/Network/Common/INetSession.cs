@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace YezhStudio.Base.Network
+namespace Base.Network
 {
     // 表示一个会话，可能是TCP，也可能是UDP
     public abstract class INetSession

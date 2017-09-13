@@ -1,5 +1,5 @@
 ﻿
-namespace YezhStudio.Base.Network
+namespace Base.Network
 {
     // 网络相关的一些常数参数
     public static class NetworkCommon

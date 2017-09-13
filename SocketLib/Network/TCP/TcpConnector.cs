@@ -4,7 +4,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 
-namespace YezhStudio.Base.Network
+namespace Base.Network
 {
     public class ClientCfg
     {
@@ -16,7 +16,7 @@ namespace YezhStudio.Base.Network
     // 通过回调函数取到会话对象
     public class TcpConnector : IDisposable
     {
-        public delegate void ConnectCallback(INetSession session, bool success, string errMsg);
+        public delegate void ConnectCallback(bool success, string errMsg, INetSession session);
 
         public TcpConnector()
         {
@@ -29,6 +29,7 @@ namespace YezhStudio.Base.Network
         public void Close()
         {
             state = Closed;
+            connSAEA.Completed -= onConnectCompleted;
         }
 
         public void Dispose()
@@ -45,54 +46,29 @@ namespace YezhStudio.Base.Network
                 return;
             }
 
-            IPAddress address;
-            try
+            this.ip   = host;
+            this.port = port;
+            this.callback = callback;
+
+            DNS.ResolveHost(host, (bool succ, string msg, IPAddress address) =>
             {
-                // 解析地址
-                if (!IPAddress.TryParse(host, out address))
+                if (!succ)
                 {
-                    // 解析地址失败，查询DNS
-                    Dns.BeginGetHostEntry(host, getHostEntryCallback, callback);
+                    callback(succ, msg, null);
+                    return;
                 }
-                else
-                {
-                    // 解析成功，开始连接
-                    // connectAsync(address, port, callback);
-                    connectSync(address, port, callback);
-                }
-            }
-            catch (Exception e)
-            {
-                Debug.Write(string.Format("连接[{0}/{1}]失败！\nMessage: {2}\nStackTrace: {1}", host, port, e.Message, e.StackTrace), "Connector");
-                callback.Invoke(null, false, e.Message);
-            }
+
+                // 异步连接
+                connectAsync(address, port);
+            });
         }
 
-        // 异步DNS解析回调
-        private void getHostEntryCallback(IAsyncResult ar)
-        {
-            ConnectCallback callback = null;
-            try
-            {
-                callback = (ConnectCallback)ar.AsyncState;
-                var entries = Dns.EndGetHostEntry(ar);
-
-                // 开始连接
-                //connectAsync(entries.AddressList[0], port, callback);
-                connectSync(entries.AddressList[0], port, callback);
-            }
-            catch (Exception e)
-            {
-                callback(null, false, e.Message);
-                Close();
-            }
-        }
-
-        private void connectSync(IPAddress address, int port, ConnectCallback cb)
+        // 同步连接远程服务器
+        private void connectSync(IPAddress address, int port)
         {
             try
             {
-                socket = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+                var socket = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
                 socket.Connect(new IPEndPoint(address, port));
 
                 Debug.Assert(socket.Connected, "连接服务器失败！", "Connector");
@@ -101,22 +77,23 @@ namespace YezhStudio.Base.Network
                 // 开始接收数据
                 session.startReceive();
                 // 调用回调
-                cb(session, true, "连接成功!");
+                callback.Invoke(true, "连接成功!", session);
             }
             catch (Exception e)
             {
                 Utils.logger.Error(string.Format("连接远程服务器出错！\nMessage: {0}\nStackTrace: {1}\n", e.Message, e.StackTrace), "Connector");
+                callback.Invoke(false, e.Message, null);
             }
         }
 
         // 异步连接
-        private void connectAsync(IPAddress address, int port, ConnectCallback callback)
+        private void connectAsync(IPAddress address, int port)
         {
             Debug.Assert(state == Connecting);
             // TODO: IPV6
-            socket = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            var socket = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
 
-            connSAEA.UserToken      = new UserToken(callback, null);
+            connSAEA.UserToken      = socket;
             connSAEA.RemoteEndPoint = new IPEndPoint(address, port);
 
             try
@@ -128,8 +105,8 @@ namespace YezhStudio.Base.Network
             }
             catch (Exception e)
             {
-                Debug.Write(string.Format("连接[{0}/{1}]失败！\nMessage: {2}\nStackTrace: {1}", address, port, e.Message, e.StackTrace), "Connector");
-                callback.Invoke(null, false, e.Message);
+                Utils.logger.Error(string.Format("连接[{0}/{1}]失败！\nMessage: {2}\nStackTrace: {1}", address, port, e.Message, e.StackTrace), "Connector");
+                callback.Invoke(false, e.Message, null);
             }
         }
 
@@ -138,18 +115,18 @@ namespace YezhStudio.Base.Network
         {
             Debug.Assert(state == Connecting);
 
-            var token = (UserToken)e.UserToken;
+            var socket = (Socket)e.UserToken;
 
             if (e.SocketError != SocketError.Success)
             {
-                token.callback(null, false, "连接失败！");
+                callback.Invoke(false, "连接失败！", null);
                 Close();
                 return;
             }
 
             if (Interlocked.CompareExchange(ref state, Connected, Connecting) != Connecting)
             {
-                token.callback(null, false, "Connector状态不正确！");
+                callback.Invoke(false, "Connector状态不正确！", null);
                 Close();
                 return;
             }
@@ -159,30 +136,19 @@ namespace YezhStudio.Base.Network
             // 开始接收数据
             session.startReceive();
             // 调用回调
-            token.callback(session, true, "连接成功!");
+            callback.Invoke(true, "连接成功!", session);
         }
 
         private string ip;
         private int port;
-        private Socket socket;
-
+        public ConnectCallback callback;
         private SocketAsyncEventArgs connSAEA;
 
         private int state;
+
         private readonly int None = 0;
         private readonly int Connecting = 1;
         private readonly int Connected  = 2;
         private readonly int Closed     = 3;
-
-        internal class UserToken
-        {
-            public UserToken(ConnectCallback cb, Socket s)
-            {
-                callback = cb;
-                socket = s;
-            }
-            public ConnectCallback callback;
-            public Socket socket;
-        }
     }
 }

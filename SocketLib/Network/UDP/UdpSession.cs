@@ -2,7 +2,7 @@
 using System.Diagnostics;
 using System.Net;
 
-namespace YezhStudio.Base.Network
+namespace Base.Network
 {
     // UDP会话
     // 表示一个UDP客户端与UDP服务器的连接，使用KCP协议通讯，用conv来标识用户身份

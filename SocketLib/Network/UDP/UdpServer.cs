@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 
-namespace YezhStudio.Base.Network
+namespace Base.Network
 {
     enum ServerState
     {

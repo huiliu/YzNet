@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using NLog;
 
-namespace YezhStudio.Base.Network
+namespace Base.Network
 {
     public static class Utils
     {

@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.Collections.Generic;
 using System.Net.Sockets;
 
-namespace YezhStudio.Base.Network
+namespace Base.Network
 {
     // TCP会话
     // 表示一条TCP连接

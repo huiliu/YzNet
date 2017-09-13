@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace YezhStudio.Base.Network
+namespace Base.Network
 {
     // 统计网络相关信息
     class NetStatistics : IDisposable

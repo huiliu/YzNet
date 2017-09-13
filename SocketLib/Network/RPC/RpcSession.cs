@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 
-namespace YezhStudio.Base.Network
+namespace Base.Network
 {
     // RPC会话
     class RpcSession
