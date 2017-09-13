@@ -75,7 +75,7 @@ namespace YezhStudio.Base.Network
         // KCP更新
         public void Update()
         {
-            while (IsConnected)
+            if (IsConnected)
             {
                 kcpUpdate(Utils.IClock());
             }
