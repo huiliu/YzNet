@@ -104,7 +104,7 @@ namespace Base.Network
                 return;
             }
 
-            if (e.BytesTransferred <= 0 || e.SocketError != SocketError.Success)
+            if (e.SocketError != SocketError.Success)
             {
                 shouldBeClose(e.SocketError);
                 return;
