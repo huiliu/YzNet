@@ -15,23 +15,23 @@ namespace Base.Network
     public class UdpServer : IDisposable
     {
         // 服务关闭
-        public event Action                                 OnServerClose;
+        public event Action                                     OnServerClose;
 
         // 收到UDP数据
         // 需要处理可能是首次连接的客户端
-        public event Action<UdpServer, EndPoint, byte[], int> OnMessageReceived;
+        public event Action<UdpServer, EndPoint, byte[], int>   OnMessageReceived;
 
         public UdpServer()
         {
             isSending = false;
             toBeSendingQueue = new Queue<DatagramPacket>();
             sendSAEA = new SocketAsyncEventArgs();
-            sendSAEA.Completed += onSendCompleted;
+            sendSAEA.Completed += OnSendCompleted;
 
             // TODO: 优化
             recvBuffer = new byte[NetworkCommon.UdpRecvBuffer];
             recvSAEA = new SocketAsyncEventArgs();
-            recvSAEA.Completed += onRecvCompleted;
+            recvSAEA.Completed += OnRecvCompleted;
         }
 
         // 启动UDP服务，开始接受"新连接"和数据
@@ -52,7 +52,7 @@ namespace Base.Network
             socket.ReceiveBufferSize = NetworkCommon.UdpRecvBuffer;
 
             state = ServerState.Start;
-            startReceive();
+            StartReceive();
         }
 
         // 停止服务
@@ -60,26 +60,25 @@ namespace Base.Network
         {
             state = ServerState.Closed;
 
-            recvSAEA.Completed -= onRecvCompleted;
-            sendSAEA.Completed -= onSendCompleted;
+            recvSAEA.Completed -= OnRecvCompleted;
+            sendSAEA.Completed -= OnSendCompleted;
 
             toBeSendingQueue.Clear();
 
             socket.Close();
-
-            if (OnServerClose != null)
-            {
-                OnServerClose.Invoke();
-            }
+            OnServerClose?.Invoke();
         }
 
         public void Dispose()
         {
+            socket.Dispose();
             sendSAEA.Dispose();
             recvSAEA.Dispose();
         }
 
-        private void startReceive()
+        #region 接收数据
+        // 开始接收数据
+        private void StartReceive()
         {
             recvSAEA.RemoteEndPoint = new IPEndPoint(IPAddress.Any, 0);
             recvSAEA.SetBuffer(recvBuffer, 0, recvBuffer.Length);
@@ -88,16 +87,16 @@ namespace Base.Network
             {
                 if (!socket.ReceiveFromAsync(recvSAEA))
                 {
-                    onRecvCompleted(this, recvSAEA);
+                    OnRecvCompleted(this, recvSAEA);
                 }
             }
             catch (Exception e)
             {
-                shouldBeClose(e);
+                ShouldBeClose(e);
             }
         }
 
-        private void onRecvCompleted(object sender, SocketAsyncEventArgs e)
+        private void OnRecvCompleted(object sender, SocketAsyncEventArgs e)
         {
             if (state != ServerState.Start)
             {
@@ -106,19 +105,36 @@ namespace Base.Network
 
             if (e.SocketError != SocketError.Success)
             {
-                shouldBeClose(e.SocketError);
+                ShouldBeClose(new Exception("接收错误！"));
                 return;
             }
 
-            // 处理收到的网络消息，如果使用异步，需要将BUFFER拷贝一份
-            OnMessageReceived(this, e.RemoteEndPoint, e.Buffer, e.BytesTransferred);
-
-            // 继续收取
-            startReceive();
+            try
+            {
+                // 处理收到的网络消息，如果使用异步，需要将BUFFER拷贝一份
+                OnMessageReceived(this, e.RemoteEndPoint, e.Buffer, e.BytesTransferred);
+            }
+            catch (Exception err)
+            {
+                Utils.logger.Error(string.Format("处理来自[{0}]的消息出错！\nMessage: {1}\nStackStrace: {2}", e.RemoteEndPoint, err.Message, err.StackTrace), "UdpServer");
+            }
+            finally
+            {
+                // 继续收取
+                StartReceive();
+            }
         }
+        #endregion
+
+        #region 发送数据
         // 发送消息至remoteEndPoint
         public void SendMessage(byte[] buff, object remoteEndPoint = null)
         {
+            if (state != ServerState.Start)
+            {
+                return;
+            }
+
             if (remoteEndPoint is IPEndPoint)
             {
                 lock(toBeSendingQueue)
@@ -133,57 +149,52 @@ namespace Base.Network
                     isSending = true;
                 }
 
-                sendMessageImpl(buff, remoteEndPoint as IPEndPoint);
+                SendMessageImpl(buff, remoteEndPoint as IPEndPoint);
             }
         }
 
-        private void sendMessageImpl(byte[] buff, IPEndPoint endPoint)
+        private void SendMessageImpl(byte[] buff, IPEndPoint endPoint)
         {
-            // TODO: 优化
-            sendSAEA = new SocketAsyncEventArgs();
-            sendSAEA.Completed += onSendCompleted;
             sendSAEA.RemoteEndPoint = endPoint;
             sendSAEA.SetBuffer(buff, 0, buff.Length);
 
-            Console.WriteLine("remoteEndPoint: {0}", endPoint);
-            sendToSocketEx(sendSAEA);
+            SendToSocketEx(sendSAEA);
         }
 
-        private void sendToSocketEx(SocketAsyncEventArgs e)
+        private void SendToSocketEx(SocketAsyncEventArgs e)
         {
             try
             {
                 if (!socket.SendToAsync(e))
                 {
-                    onSendCompleted(null, sendSAEA);
+                    OnSendCompleted(null, sendSAEA);
                 }
             }
             catch (Exception err)
             {
-                shouldBeClose(err);
+                ShouldBeClose(err);
             }
         }
 
-        private void onSendCompleted(object sender, SocketAsyncEventArgs e)
+        private void OnSendCompleted(object sender, SocketAsyncEventArgs e)
         {
-            if (e.BytesTransferred > 0 && e.SocketError != SocketError.Success)
-            {
-                shouldBeClose(e.SocketError);
-                return;
-            }
-
             if (state != ServerState.Start)
             {
                 return;
             }
 
+            if (e.SocketError != SocketError.Success)
+            {
+                ShouldBeClose(new Exception("发送错误！"));
+                return;
+            }
 
             if (e.Buffer.Length != e.BytesTransferred)
             {
                 // 未完成发送
                 e.SetBuffer(e.Buffer, e.Offset, e.Buffer.Length - e.BytesTransferred);
                 Console.WriteLine("UDP包没有发送完！{0}/{1}", e.BytesTransferred, e.Buffer.Length);
-                sendToSocketEx(e);
+                SendToSocketEx(e);
             }
             else
             {
@@ -200,19 +211,15 @@ namespace Base.Network
                     nextPacket = toBeSendingQueue.Dequeue();
                 }
 
-                sendMessageImpl(nextPacket.Content, nextPacket.EndPoint);
+                SendMessageImpl(nextPacket.Content, nextPacket.EndPoint);
             }
         }
+        #endregion
 
-        private void shouldBeClose(Exception e)
+        private void ShouldBeClose(Exception e)
         {
-            Console.WriteLine("捕捉到异常：{0}\nStackTrace: {1}", e.Message, e.StackTrace);
+            Utils.logger.Error("捕捉到异常：{0}\nStackTrace: {1}", e.Message, e.StackTrace);
             Stop();
-        }
-
-        private void shouldBeClose(SocketError errCode)
-        {
-            Console.WriteLine("发生了错误！ErroCode: {0}", errCode);
         }
 
         private Socket  socket;

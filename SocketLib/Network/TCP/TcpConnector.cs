@@ -6,12 +6,6 @@ using System.Threading;
 
 namespace Base.Network
 {
-    public class ClientCfg
-    {
-        public string IP;
-        public int Port; 
-    }
-
     // 用于与服务端建立连接
     // 通过回调函数取到会话对象
     public class TcpConnector : IDisposable
@@ -23,13 +17,13 @@ namespace Base.Network
             state = None;
 
             connSAEA = new SocketAsyncEventArgs();
-            connSAEA.Completed += onConnectCompleted;
+            connSAEA.Completed += OnConnectCompleted;
         }
 
         public void Close()
         {
             state = Closed;
-            connSAEA.Completed -= onConnectCompleted;
+            connSAEA.Completed -= OnConnectCompleted;
         }
 
         public void Dispose()
@@ -59,7 +53,7 @@ namespace Base.Network
                 }
 
                 // 异步连接
-                connectAsync(address, port);
+                ConnectAsync(address, port);
             });
         }
 
@@ -87,7 +81,7 @@ namespace Base.Network
         }
 
         // 异步连接
-        private void connectAsync(IPAddress address, int port)
+        private void ConnectAsync(IPAddress address, int port)
         {
             Debug.Assert(state == Connecting);
             // TODO: IPV6
@@ -100,7 +94,7 @@ namespace Base.Network
             {
                 if (!socket.ConnectAsync(connSAEA))
                 {
-                    onConnectCompleted(this, connSAEA);
+                    OnConnectCompleted(this, connSAEA);
                 }
             }
             catch (Exception e)
@@ -111,7 +105,7 @@ namespace Base.Network
         }
 
         // 异步连接回调
-        private void onConnectCompleted(object sender, SocketAsyncEventArgs e)
+        private void OnConnectCompleted(object sender, SocketAsyncEventArgs e)
         {
             Debug.Assert(state == Connecting);
 

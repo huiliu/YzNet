@@ -36,7 +36,6 @@ namespace Base.Network
                 kcp.NoDelay(1, 10, 2, 1);
                 kcp.WndSize(NetworkCommon.KcpSendWnd, NetworkCommon.KcpRecvWnd);
             }
-
         }
 
         public void Dispose()

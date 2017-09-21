@@ -27,27 +27,7 @@ namespace Base.Network
 
             nextUpdateTimeMs = Utils.IClock();
 
-            kcp = new KCP(conv, (buff, sz) =>
-            {
-                try
-                {
-                    if (!IsConnected)
-                    {
-                        return;
-                    }
-
-                    // 将KCP中消息通过UDP Server发送给目标
-                    byte[] b = new byte[sz];
-                    Array.Copy(buff, 0, b, 0, sz);
-
-                    // 发送到网络
-                    server.SendMessage(b, remoteEndPoint);
-                }
-                catch (Exception e)
-                {
-                    shouldBeClose(e);
-                }
-            });
+            kcp = new KCP(conv, KcpOut);
 
             // TODO: 配置KCP参数
             lock(kcp)
@@ -68,7 +48,6 @@ namespace Base.Network
         public override void Close()
         {
             IsConnected = false;
-
             base.Close();
         }
 
@@ -77,7 +56,7 @@ namespace Base.Network
         {
             if (IsConnected)
             {
-                kcpUpdate(Utils.IClock());
+                KcpUpdate(Utils.IClock());
             }
         }
 
@@ -105,6 +84,30 @@ namespace Base.Network
                 kcp.Flush();
             }
         }
+
+        private void KcpOut(byte[] buff, int size)
+        {
+            Debug.Assert(server != null, "UdpServer不存在！", "UdpSession");
+
+            try
+            {
+                if (!IsConnected)
+                {
+                    return;
+                }
+
+                // 将KCP中消息通过UDP Server发送给目标
+                byte[] b = new byte[size];
+                Array.Copy(buff, 0, b, 0, size);
+
+                // 发送到网络
+                server.SendMessage(b, remoteEndPoint);
+            }
+            catch (Exception e)
+            {
+                ShouldBeClose(e);
+            }
+        }
         #endregion
 
         #region 接收数据
@@ -120,11 +123,11 @@ namespace Base.Network
                 kcp.Flush();
             }
 
-            checkReceiveKcpMessage();
+            CheckReceiveKcpMessage();
         }
 
         // 检查KCP是否有消息需要处理
-        private void checkReceiveKcpMessage()
+        private void CheckReceiveKcpMessage()
         {
             lock(kcp)
             {
@@ -135,23 +138,22 @@ namespace Base.Network
                     if (kcp.Recv(b) > 0)
                     {
                         // 处理收到的消息
-                        processReceivedMessage(b);
+                        ProcessReceivedMessage(b);
                     }
                 }
             }
         }
 
-        private void processReceivedMessage(byte[] buff)
+        private void ProcessReceivedMessage(byte[] buff)
         {
             recvBuffer.WriteBytes(buff);
 
             int msgID = -1;
-            int cookie;
             byte[] msg = null;
 
             try
             {
-                while ((msg = MessageHeader.TryDecode(recvBuffer, out msgID, out cookie)) != null)
+                while ((msg = MessageHeader.TryDecode(recvBuffer, out msgID, out int cookie)) != null)
                 {
                     // 将消息分发
                     triggerMessageReceived(this, msgID, msg);
@@ -167,7 +169,7 @@ namespace Base.Network
         #endregion
 
         // 检查异常原因，关闭会话
-        private void shouldBeClose(Exception e)
+        private void ShouldBeClose(Exception e)
         {
             Console.WriteLine("捕捉到异常！Message: {0}\nStackTrace: {1}\n", e.Message, e.StackTrace);
             Close();
@@ -175,7 +177,7 @@ namespace Base.Network
 
         // 定时调用
         // TODO: 调用频繁，每个连接一个
-        private void kcpUpdate(UInt32 currentMs)
+        private void KcpUpdate(UInt32 currentMs)
         {
 
             if (currentMs >= nextUpdateTimeMs)
@@ -186,7 +188,7 @@ namespace Base.Network
                     nextUpdateTimeMs = kcp.Check(currentMs);
                 }
 
-                checkReceiveKcpMessage();
+                CheckReceiveKcpMessage();
             }
         }
 

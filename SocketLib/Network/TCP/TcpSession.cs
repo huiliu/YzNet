@@ -9,12 +9,6 @@ namespace Base.Network
     // 表示一条TCP连接
     public class TcpSession : INetSession, IDisposable
     {
-        public static TcpSession Create(Socket s)
-        {
-            var session = new TcpSession(s);
-            return session;
-        }
-
         public TcpSession(Socket socket)
         {
             this.socket = socket;
@@ -25,14 +19,13 @@ namespace Base.Network
             socket.ReceiveBufferSize = NetworkCommon.TcpRecvBuffer;
 
             recvSAEA      = new SocketAsyncEventArgs();
-            recvSAEA.Completed  += recvSAEACompleted;
+            recvSAEA.Completed  += RecvSAEACompleted;
             recvBuffer    = new ByteBuffer(NetworkCommon.MaxPackageSize);
 
             isSending     = false;
             sendSAEA      = new SocketAsyncEventArgs();
-            sendSAEA.Completed  += sendSAEACompleted;
+            sendSAEA.Completed  += SendSAEACompleted;
             toBeSendQueue = new Queue<ArraySegment<byte>>();
-
 
             IsConnected = true;
 
@@ -42,22 +35,22 @@ namespace Base.Network
         // 关闭Session
         public override void Close()
         {
-            statistics.Close();
-
             IsConnected = false;
             socket.Close();
+            statistics.Close();
 
             base.Close();
         }
 
         public void Dispose()
         {
+            socket.Dispose();
             toBeSendQueue.Clear();
         }
 
         private void shouldBeClose(Exception e)
         {
-            Console.WriteLine("[Id: {2}]捕捉到异常!\nMessage: {0}\nStackTrace: {1}", e.Message, e.StackTrace, SessionID);
+            Utils.logger.Info("[Id: {2}]捕捉到异常!\nMessage: {0}\nStackTrace: {1}", e.Message, e.StackTrace, SessionID);
             Close();
         }
 
@@ -68,7 +61,7 @@ namespace Base.Network
             if (recvBuffer.WriteableBytes == 0)
             {
                 // 如果经常进入此块，应该初始时即将recvBuffer设置足够大
-                Debug.WriteLine("没有足够的缓冲区接收数据！", this.ToString());
+                Utils.logger.Warn("没有足够的缓冲区接收数据！", "TcpSession");
                 recvBuffer.Shrink(1024);
             }
 
@@ -80,7 +73,7 @@ namespace Base.Network
                 if (!socket.ReceiveAsync(recvSAEA))
                 {
                     // 同步完成
-                    recvSAEACompleted(null, recvSAEA);
+                    RecvSAEACompleted(null, recvSAEA);
                 }
             }
             catch (Exception e)
@@ -89,11 +82,12 @@ namespace Base.Network
             }
         }
 
-        private void recvSAEACompleted(object sender, SocketAsyncEventArgs e)
+        private void RecvSAEACompleted(object sender, SocketAsyncEventArgs e)
         {
             if (!IsConnected)
             {
                 // Session状态不满足
+                Utils.logger.Error("会话状态错误！", "TcpSession");
                 return;
             }
 
@@ -111,12 +105,11 @@ namespace Base.Network
 
             // 尝试解析并分发消息
             int msgID = -1;
-            int cookie;
             byte[] msg = null;
 
             try
             {
-                while ((msg = MessageHeader.TryDecode(recvBuffer, out msgID, out cookie)) != null)
+                while ((msg = MessageHeader.TryDecode(recvBuffer, out msgID, out int cookie)) != null)
                 {
                     ++statistics.RecvPacketCount;
                     triggerMessageReceived(this, msgID, msg);
@@ -124,7 +117,7 @@ namespace Base.Network
             }
             catch (Exception err)
             {
-                Utils.logger.Error(string.Format("处理消息[{0}]出错！Message: {1}\nStackTrace: {2}", msgID, err.Message, err.StackTrace), ToString());
+                Utils.logger.Error(string.Format("处理消息[{0}]出错！Message: {1}\nStackTrace: {2}", msgID, err.Message, err.StackTrace), "TcpSession");
             }
 
             // 尝试调整Buffer
@@ -139,11 +132,11 @@ namespace Base.Network
         // 发送Buffer
         public override void SendMessage(int msgID, ByteBuffer data)
         {
-            sendMessageImpl(msgID, data);
+            SendMessageImpl(msgID, data);
         }
 
         // 发送Buffer
-        private void sendMessageImpl(int msgID, ByteBuffer data)
+        private void SendMessageImpl(int msgID, ByteBuffer data)
         {
             ++statistics.SendPacketCount;
             // 添加消息头
@@ -160,7 +153,7 @@ namespace Base.Network
                     if (toBeSendQueue.Count >= NetworkCommon.MaxCacheMessage)
                     {
                         // 消息缓存数超过上限
-                        Debug.Write(string.Format("Session[{0}]消息缓存数超过上限！强制关闭连接", SessionID), ToString());
+                        Utils.logger.Error(string.Format("Session[{0}]消息缓存数超过上限！强制关闭连接", SessionID), "TcpSession");
                         Close();
                     }
 
@@ -172,11 +165,11 @@ namespace Base.Network
 
             // 直接发送
             var sendQueue = new SendingQueue(buff.Buffer);
-            sendToSocket(sendQueue);
+            SendToSocket(sendQueue);
        }
 
         // 通过socket发送消息
-        private void sendToSocket(SendingQueue queue)
+        private void SendToSocket(SendingQueue queue)
         {
             try
             {
@@ -185,11 +178,10 @@ namespace Base.Network
                 sendSAEA.BufferList = queue;
 
                 ++statistics.CallSendAsyncCount;
-                var ret = socket.SendAsync(sendSAEA);
-                if (!ret)
+                if (!socket.SendAsync(sendSAEA))
                 {
                     // 同步完成
-                    sendSAEACompleted(null, sendSAEA);
+                    SendSAEACompleted(null, sendSAEA);
                 }
             }
             catch (Exception e)
@@ -199,14 +191,8 @@ namespace Base.Network
         }
 
         // SendAsync回调
-        private void sendSAEACompleted(object sender, SocketAsyncEventArgs e)
+        private void SendSAEACompleted(object sender, SocketAsyncEventArgs e)
         {
-            SocketError socketError;
-            SendingQueue srcQueue;
-
-            socketError = e.SocketError;
-            srcQueue = e.UserToken as SendingQueue;
-
             if (!IsConnected)
             {
                 return;
@@ -214,9 +200,12 @@ namespace Base.Network
 
             if (e.SocketError != SocketError.Success)
             {
-                Close();
+                shouldBeClose(new Exception(string.Format("发送返回错误[{0}]", e.SocketError)));
                 return;
             }
+
+            SendingQueue srcQueue;
+            srcQueue = e.UserToken as SendingQueue;
 
             Console.WriteLine("sendMessage: {0}bytes", e.BytesTransferred);
             if (srcQueue.Trim(e.BytesTransferred))
@@ -244,12 +233,12 @@ namespace Base.Network
                 }
 
                 // 发送缓存数据
-                sendToSocket(new SendingQueue(arr));
+                SendToSocket(new SendingQueue(arr));
             }
             else
             {
                 // 还有部分数据没有发送
-                sendToSocket(srcQueue);
+                SendToSocket(srcQueue);
             }
         }
 
@@ -386,7 +375,6 @@ namespace Base.Network
         #endregion
 
         private Socket  socket;
-
         ByteBuffer                      recvBuffer;
         private SocketAsyncEventArgs    recvSAEA;
 

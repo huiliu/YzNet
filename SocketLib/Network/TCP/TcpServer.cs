@@ -6,8 +6,6 @@ using System.Net.Sockets;
 namespace Base.Network
 {
     // TCP服务器，侦听网络商品，接受新进入的连接
-    // TODO:
-    //  1. 连接数限制
     public class TcpServer : IDisposable
     {
         // 侦听服务关闭
@@ -23,7 +21,7 @@ namespace Base.Network
             isClosed  = false;
 
             acceptSAEA = new SocketAsyncEventArgs();
-            acceptSAEA.Completed += onAcceptCompleted;
+            acceptSAEA.Completed += OnAcceptCompleted;
         }
 
         // 开始服务
@@ -35,19 +33,18 @@ namespace Base.Network
                 return;
             }
 
-            Debug.Assert(OnNewConnection != null, string.Format("[{0}]没有设置处理新连接的回调! [{1}/{2}]", name, ip, port), ToString());
+            Debug.Assert(OnNewConnection != null, string.Format("[{0}]没有设置处理新连接的回调! [{1}/{2}]", name, ip, port), "TcpServer");
 
             try
             {
-                // TODO: IPV6
-                socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+                socket = new Socket(AddressFamily.InterNetwork | AddressFamily.InterNetworkV6, SocketType.Stream, ProtocolType.Tcp);
                 socket.Bind(new IPEndPoint(IPAddress.Parse(ip), port));
                 socket.Listen (100);
                 socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
 
                 Utils.logger.Info("[{0}]服务启动成功！开始接受连接", name);
 
-                startAcceptConnection();
+                StartAcceptConnection();
             }
             catch (Exception e)
             {
@@ -60,17 +57,10 @@ namespace Base.Network
         public void Stop()
         {
             isClosed = true;
-            acceptSAEA.Completed -= onAcceptCompleted;
+            acceptSAEA.Completed -= OnAcceptCompleted;
 
-            if (socket != null)
-            {
-                socket.Close();
-            }
-
-            if (OnServerClosed != null)
-            {
-                OnServerClosed.Invoke();
-            }
+            socket?.Close();
+            OnServerClosed?.Invoke();
         }
 
         public void Dispose()
@@ -80,7 +70,7 @@ namespace Base.Network
         }
 
         // 接收新连接进入
-        private void startAcceptConnection()
+        private void StartAcceptConnection()
         {
             try
             {
@@ -88,7 +78,7 @@ namespace Base.Network
                 // 开始接收连接
                 if (!socket.AcceptAsync(acceptSAEA))
                 {
-                    onAcceptCompleted(this, acceptSAEA);
+                    OnAcceptCompleted(this, acceptSAEA);
                 }
             }
             catch (Exception e)
@@ -100,11 +90,11 @@ namespace Base.Network
         }
 
         // 接收新连接回调
-        private void onAcceptCompleted(object sender, SocketAsyncEventArgs e)
+        private void OnAcceptCompleted(object sender, SocketAsyncEventArgs e)
         {
             if (isClosed)
             {
-                Utils.logger.Info(string.Format("服务[{0}]已经关闭！", name), ToString());
+                Utils.logger.Info(string.Format("服务[{0}]已经关闭！", name), "TcpServer");
                 return;
             }
 
@@ -114,24 +104,21 @@ namespace Base.Network
                 return;
             }
 
-            Debug.Assert(e.AcceptSocket != null, string.Format("启动服务[{0}]失败！", name), ToString());
+            Debug.Assert(e.AcceptSocket != null, string.Format("启动服务[{0}]失败！", name), "TcpServer");
 
             try
             {
-                if(OnNewConnection != null)
-                {
-                    // 处理新连接
-                    OnNewConnection.Invoke(new TcpSession(e.AcceptSocket));
-                }
+                // 处理新连接
+                OnNewConnection?.Invoke(new TcpSession(e.AcceptSocket));
             }
             catch (Exception err)
             {
-                Utils.logger.Error(string.Format("[{0}]处理接收新连接失败!\nMessage: {1}\nStackTrace: {2}", name, err.Message, err.StackTrace), "Server");
+                Utils.logger.Error(string.Format("[{0}]处理接收新连接失败!\nMessage: {1}\nStackTrace: {2}", name, err.Message, err.StackTrace), "TcpServer");
             }
             finally
             {
                 // 继续侦听
-                startAcceptConnection();
+                StartAcceptConnection();
             }
         }
 
