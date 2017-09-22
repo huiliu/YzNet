@@ -9,6 +9,9 @@ namespace Base.Network
     // 表示一条TCP连接
     public class TcpSession : INetSession, IDisposable
     {
+        public static event Action<INetSession>                 OnSessionClosed;
+        public static event Action<INetSession, int, byte[]>    OnMessageReceived;
+
         public TcpSession(Socket socket)
         {
             this.socket = socket;
@@ -27,28 +30,30 @@ namespace Base.Network
             sendSAEA.Completed  += SendSAEACompleted;
             toBeSendQueue = new Queue<ArraySegment<byte>>();
 
-            IsConnected = true;
-
+            isClosed = false;
             statistics = new NetStatistics(this);
         }
 
         // 关闭Session
         public override void Close()
         {
-            IsConnected = false;
+            isClosed = true;
+
             socket.Close();
+            toBeSendQueue.Clear();
             statistics.Close();
 
-            base.Close();
+            OnSessionClosed?.Invoke(this);
         }
 
         public void Dispose()
         {
             socket.Dispose();
-            toBeSendQueue.Clear();
+            recvSAEA.Dispose();
+            sendSAEA.Dispose();
         }
 
-        private void shouldBeClose(Exception e)
+        private void HandleException(Exception e)
         {
             Utils.logger.Info("[Id: {2}]捕捉到异常!\nMessage: {0}\nStackTrace: {1}", e.Message, e.StackTrace, SessionID);
             Close();
@@ -56,7 +61,7 @@ namespace Base.Network
 
         #region 接收网络消息
         // 开始接收网络消息
-        public override void startReceive()
+        public override void StartReceive()
         {
             if (recvBuffer.WriteableBytes == 0)
             {
@@ -78,13 +83,13 @@ namespace Base.Network
             }
             catch (Exception e)
             {
-                shouldBeClose(e);
+                HandleException(e);
             }
         }
 
         private void RecvSAEACompleted(object sender, SocketAsyncEventArgs e)
         {
-            if (!IsConnected)
+            if (isClosed)
             {
                 // Session状态不满足
                 Utils.logger.Error("会话状态错误！", "TcpSession");
@@ -94,7 +99,7 @@ namespace Base.Network
             if (e.BytesTransferred <= 0 || e.SocketError != SocketError.Success)
             {
                 // 发生错误
-                shouldBeClose(new InvalidOperationException("接收操作失败或对方关闭了连接！"));
+                HandleException(new InvalidOperationException("接收操作失败或对方关闭了连接！"));
                 return;
             }
 
@@ -112,7 +117,7 @@ namespace Base.Network
                 while ((msg = MessageHeader.TryDecode(recvBuffer, out msgID, out int cookie)) != null)
                 {
                     ++statistics.RecvPacketCount;
-                    triggerMessageReceived(this, msgID, msg);
+                    OnMessageReceived?.Invoke(this, msgID, msg);
                 }
             }
             catch (Exception err)
@@ -124,7 +129,7 @@ namespace Base.Network
             recvBuffer.TryDefragment();
 
             // 再次开始接收
-            startReceive();
+            StartReceive();
         }
         #endregion
 
@@ -186,21 +191,21 @@ namespace Base.Network
             }
             catch (Exception e)
             {
-                shouldBeClose(e);
+                HandleException(e);
             }
         }
 
         // SendAsync回调
         private void SendSAEACompleted(object sender, SocketAsyncEventArgs e)
         {
-            if (!IsConnected)
+            if (isClosed)
             {
                 return;
             }
 
             if (e.SocketError != SocketError.Success)
             {
-                shouldBeClose(new Exception(string.Format("发送返回错误[{0}]", e.SocketError)));
+                HandleException(new Exception(string.Format("发送返回错误[{0}]", e.SocketError)));
                 return;
             }
 
@@ -375,6 +380,7 @@ namespace Base.Network
         #endregion
 
         private Socket  socket;
+        private bool isClosed;
         ByteBuffer                      recvBuffer;
         private SocketAsyncEventArgs    recvSAEA;
 

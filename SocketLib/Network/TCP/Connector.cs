@@ -6,13 +6,13 @@ using System.Threading;
 
 namespace Base.Network
 {
-    // 用于与服务端建立连接
-    // 通过回调函数取到会话对象
-    public class TcpConnector : IDisposable
+    // 建立socket连接
+    // 通过回调函数返回socket
+    public class Connector : IDisposable
     {
-        public delegate void ConnectCallback(bool success, string errMsg, INetSession session);
+        public delegate void ConnectCallback(bool success, string errMsg, Socket s);
 
-        public TcpConnector()
+        public Connector()
         {
             state = None;
 
@@ -67,11 +67,8 @@ namespace Base.Network
 
                 Debug.Assert(socket.Connected, "连接服务器失败！", "Connector");
 
-                var session = new TcpSession(socket);
-                // 开始接收数据
-                session.startReceive();
                 // 调用回调
-                callback.Invoke(true, "连接成功!", session);
+                callback.Invoke(true, "连接成功!", socket);
             }
             catch (Exception e)
             {
@@ -125,12 +122,8 @@ namespace Base.Network
                 return;
             }
 
-            // 连接成功
-            var session = new TcpSession(socket);
-            // 开始接收数据
-            session.startReceive();
             // 调用回调
-            callback.Invoke(true, "连接成功!", session);
+            callback.Invoke(true, "连接成功!", socket);
         }
 
         private string ip;

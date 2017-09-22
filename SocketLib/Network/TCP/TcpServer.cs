@@ -39,8 +39,8 @@ namespace Base.Network
             {
                 socket = new Socket(AddressFamily.InterNetwork | AddressFamily.InterNetworkV6, SocketType.Stream, ProtocolType.Tcp);
                 socket.Bind(new IPEndPoint(IPAddress.Parse(ip), port));
-                socket.Listen (100);
                 socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+                socket.Listen (100);
 
                 Utils.logger.Info("[{0}]服务启动成功！开始接受连接", name);
 
@@ -49,6 +49,7 @@ namespace Base.Network
             catch (Exception e)
             {
                 Utils.logger.Error(string.Format("Server[{0}]failed to start!\nMessage: {1}\nStackTrace: {2}", name, e.Message, e.StackTrace), "Server");
+                Stop();
                 return;
             }
         }

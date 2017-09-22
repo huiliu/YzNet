@@ -8,46 +8,14 @@ namespace Base.Network
     // 表示一个会话，可能是TCP，也可能是UDP
     public abstract class INetSession
     {
-        public static event Action<INetSession> OnSessionClosed;
-        public static event Action<INetSession, int, byte[]> OnMessageReceived;
-
         public uint SessionID { get; set; }
 
-        private bool isConnected;
-        public bool IsConnected
-        {
-            get { return isConnected; }
-            set { isConnected = value; }
-        }
-
-        // 关闭会话
-        public virtual void Close()
-        {
-            triggerSessionClosed(this);
-        }
-
-        // Session关闭事件
-        protected void triggerSessionClosed(INetSession session)
-        {
-            if (OnSessionClosed != null)
-            {
-                OnSessionClosed.Invoke(this);
-            }
-        }
-
-        // 发到消息的事件
-        protected void triggerMessageReceived(INetSession session, int msgID, byte[] data)
-        {
-            if (OnMessageReceived != null)
-            {
-                OnMessageReceived.Invoke(session, msgID, data);
-            }
-        }
+        public abstract void Close();
 
         // 向对端发送buffer
         public abstract void SendMessage(int msgID, ByteBuffer buffer);
 
         // 开始接收数据
-        public abstract void startReceive();
+        public abstract void StartReceive();
     }
 }

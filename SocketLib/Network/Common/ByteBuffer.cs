@@ -60,6 +60,11 @@ namespace Base.Network
             return BitConverter.ToInt32(buffer, ReadIndex);
         }
 
+        public Int32 PeekInt32(int offset)
+        {
+            return BitConverter.ToInt32(buffer, ReadIndex + offset);
+        }
+
         public Int64 PeekInt64()
         {
             return BitConverter.ToInt64(buffer, ReadIndex);
@@ -165,6 +170,11 @@ namespace Base.Network
         public void WriteBytes(byte[] data)
         {
             Append(data);
+        }
+
+        public void WriteBytes(byte[] data, int offset, int len)
+        {
+            Append(data, offset, len);
         }
 
         public void WriteInt16(Int16 x)

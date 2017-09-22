@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
+using Base.Compress.LZ4ps;
 
 namespace Base.Network
 {
@@ -29,31 +30,28 @@ namespace Base.Network
         public static byte SYN_CODE2 = 77;
 
         // 加上消息头
-        public static ByteBuffer Encoding(int MsgID, ByteBuffer data, int cookie = 0, bool needCompress = false)
+        public static ByteBuffer Encoding(int MsgID, ByteBuffer data, int cookie = 0)
         {
-            var length = data.ReadableBytes + HeaderLength;
-            if (length == 0 || length > NetworkCommon.MaxPackageSize)
+            var length = data.ReadableBytes;
+            if (length == 0 || length + HeaderLength > NetworkCommon.MaxPackageSize)
             {
-                Debug.Assert(length > 0 && length <= NetworkCommon.MaxPackageSize, string.Format("消息长度不符合要求！[{0}/{1}]", length, NetworkCommon.MaxPackageSize), "MessageHeader");
+                Debug.Assert(length > 0 && length + HeaderLength <= NetworkCommon.MaxPackageSize, string.Format("消息长度不符合要求！[{0}/{1}]", length, NetworkCommon.MaxPackageSize), "MessageHeader");
                 return null;
             }
 
             Int16 ctrlCode = 0;
             try
             {
-                if (needCompress)
+                if (length >= NetworkCommon.CompressThreshold)
                 {
                     ctrlCode |= (Int16)MessageCtrlType.Compress;
+                    int compressMaxLength = LZ4Codec.MaximumOutputLength(data.ReadableBytes);
+                    byte[] compressedData = new byte[compressMaxLength];
+                    var ret = LZ4Codec.Encode64HC(data.Buffer, data.ReadIndex, data.ReadableBytes, compressedData, 0, compressMaxLength);
 
-                    using (var ms = new MemoryStream())
-                    {
-                        DeflateStream deflateStream = new DeflateStream(ms, CompressionMode.Compress);
-                        deflateStream.Write(data.Buffer, data.ReadIndex, data.ReadableBytes);
-                        deflateStream.Flush();
-
-                        data.RetrieveAll();
-                        data.WriteBytes(ms.GetBuffer());
-                    }
+                    data.ReadAll();
+                    data.WriteBytes(compressedData, 0, ret);
+                    data.WriteInt32(length);    // 将原数据长度写在最后。因为LZ4压缩算法需要此值
                 }
 
             }
@@ -101,6 +99,13 @@ namespace Base.Network
             MsgID          = BitConverter.ToInt16(head, 8);
             Int16 msgLen   = BitConverter.ToInt16(head, 10);
 
+            // 消息内容长度为0
+            if (msgLen == 0)
+            {
+                Utils.logger.Warn(string.Format("收到消息[ID: {0}]内容长度为0！", MsgID), "Message Decode");
+                return null;
+            }
+
             // 检查消息长度
             if (totalLength - HeaderLength < msgLen)
             {
@@ -111,30 +116,24 @@ namespace Base.Network
             // 跳过消息头
             buff.Retrieve(HeaderLength);
 
-            // 消息内容长度为0
-            if (msgLen == 0)
-            {
-                Utils.logger.Warn(string.Format("收到消息[ID: {0}]内容长度为0！", MsgID), "Message Decode");
-                return null;
-            }
-
             // 读取消息内容
-            byte[] msg = buff.ReadBytes(msgLen);
-            buff.Retrieve(msgLen);
+            byte[] msg = null;
             try
             {
                 if ((ctrlCode & (int)MessageCtrlType.Compress) != 0)
                 {
-                    using (var ms = new MemoryStream())
-                    {
-                        DeflateStream ds = new DeflateStream(ms, CompressionMode.Decompress);
-                        ds.Write(msg, 0, msgLen);
-                        ds.Flush();
+                    // 解压数据
+                    // 读取原数据长度
+                    var originLength = buff.PeekInt32(msgLen - 4);
+                    Debug.Assert(originLength > 0, "接收的压缩数据有误!");
 
-                        msg = ms.GetBuffer();
-                    }
+                    msg = LZ4Codec.Decode64(buff.Buffer, buff.ReadIndex, msgLen - 4, originLength);
+                    buff.Retrieve(msgLen);
                 }
-                
+                else
+                {
+                    msg = buff.ReadBytes(msgLen);
+                }
             }
             catch (Exception e)
             {

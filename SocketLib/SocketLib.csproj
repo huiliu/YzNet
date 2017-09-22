@@ -44,25 +44,16 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="7zip\Common\CommandLineParser.cs" />
-    <Compile Include="7zip\Common\CRC.cs" />
-    <Compile Include="7zip\Common\InBuffer.cs" />
-    <Compile Include="7zip\Common\OutBuffer.cs" />
-    <Compile Include="7zip\Compress\LZMA\LzmaBase.cs" />
-    <Compile Include="7zip\Compress\LZMA\LzmaDecoder.cs" />
-    <Compile Include="7zip\Compress\LZMA\LzmaEncoder.cs" />
-    <Compile Include="7zip\Compress\LZ\IMatchFinder.cs" />
-    <Compile Include="7zip\Compress\LZ\LzBinTree.cs" />
-    <Compile Include="7zip\Compress\LZ\LzInWindow.cs" />
-    <Compile Include="7zip\Compress\LZ\LzOutWindow.cs" />
-    <Compile Include="7zip\Compress\RangeCoder\RangeCoder.cs" />
-    <Compile Include="7zip\Compress\RangeCoder\RangeCoderBit.cs" />
-    <Compile Include="7zip\Compress\RangeCoder\RangeCoderBitTree.cs" />
-    <Compile Include="7zip\ICoder.cs" />
+    <Compile Include="LZ4\LZ4Codec.cs" />
+    <Compile Include="LZ4\LZ4Codec.Safe.cs" />
+    <Compile Include="LZ4\LZ4Codec.Safe32.Dirty.cs" />
+    <Compile Include="LZ4\LZ4Codec.Safe32HC.Dirty.cs" />
+    <Compile Include="LZ4\LZ4Codec.Safe64.Dirty.cs" />
+    <Compile Include="LZ4\LZ4Codec.Safe64HC.Dirty.cs" />
     <Compile Include="Network\Common\ByteBuffer.cs" />
     <Compile Include="Network\Common\DNS.cs" />
     <Compile Include="Network\Common\INetSession.cs" />
-    <Compile Include="Network\Common\kcp.cs" />
+    <Compile Include="Network\UDP\KCP.cs" />
     <Compile Include="Network\Common\MessageDispatcher.cs" />
     <Compile Include="Network\Common\MessageHeader.cs" />
     <Compile Include="Network\Common\NetworkCommon.cs" />
@@ -70,11 +61,9 @@
     <Compile Include="Network\RPC\Handler\RpcResponse.cs" />
     <Compile Include="Network\RPC\RPCManager.cs" />
     <Compile Include="Network\RPC\RpcSession.cs" />
-    <Compile Include="Network\TCP\TcpConnector.cs" />
+    <Compile Include="Network\TCP\Connector.cs" />
     <Compile Include="Network\TCP\TcpServer.cs" />
     <Compile Include="Network\TCP\TcpSession.cs" />
-    <Compile Include="Network\UDP\ReliableUdpClient.cs" />
-    <Compile Include="Network\UDP\UdpServer.cs" />
     <Compile Include="Network\UDP\UdpSession.cs" />
     <Compile Include="Network\Utils\NetStatistics.cs" />
     <Compile Include="Network\Utils\Utils.cs" />

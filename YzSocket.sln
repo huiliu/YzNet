@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.25420.1
+# Visual Studio 15
+VisualStudioVersion = 15.0.26730.16
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Server", "Server\Server.csproj", "{58228D27-91CC-4085-8686-AC9E9CBC3FBE}"
 EndProject
@@ -13,10 +13,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestTcpServer", "TestTcpSer
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SocketLib", "SocketLib\SocketLib.csproj", "{EFC12F3D-D7F3-4803-A287-61771B3D9552}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SocketLibTests", "SocketLibTests\SocketLibTests.csproj", "{E83DC251-83DC-4850-B42A-4C795B13F0B5}"
+EndProject
 Global
-	GlobalSection(Performance) = preSolution
-		HasPerformanceSessions = true
-	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
@@ -42,11 +41,18 @@ Global
 		{EFC12F3D-D7F3-4803-A287-61771B3D9552}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EFC12F3D-D7F3-4803-A287-61771B3D9552}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{EFC12F3D-D7F3-4803-A287-61771B3D9552}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E83DC251-83DC-4850-B42A-4C795B13F0B5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E83DC251-83DC-4850-B42A-4C795B13F0B5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E83DC251-83DC-4850-B42A-4C795B13F0B5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E83DC251-83DC-4850-B42A-4C795B13F0B5}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {1E3639A0-0E85-4F0C-BE0C-3E4CBDDC0C69}
+	EndGlobalSection
+	GlobalSection(Performance) = preSolution
+		HasPerformanceSessions = true
 	EndGlobalSection
 EndGlobal

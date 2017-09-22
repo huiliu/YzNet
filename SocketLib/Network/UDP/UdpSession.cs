@@ -1,118 +1,152 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net;
+using System.Net.Sockets;
+using System.Threading;
 
 namespace Base.Network
 {
-    // UDP会话
-    // 表示一个UDP客户端与UDP服务器的连接，使用KCP协议通讯，用conv来标识用户身份
-    // TODO: 只用一个uint32数来识别客户端，可能不安全
+    // 集成KCP功能的UDP客户端
     public class UdpSession : INetSession, IDisposable
     {
+        public event Action<INetSession, int, byte[]> OnMessageReceived;  // 收到数据回调
+        public event Action<INetSession>              OnDisconnected;     // 连接断开回调
 
-        public static UdpSession Create(uint conv, EndPoint clientEndPoint, UdpServer server)
+        public UdpSession(Socket s, UInt32 conv)
         {
-            var session = new UdpSession(conv, clientEndPoint, server);
-            return session;
-        }
+            socket = s;
+            socket.SendBufferSize    = NetworkCommon.UdpSendBuffer;
+            socket.ReceiveBufferSize = NetworkCommon.UdpRecvBuffer;
 
-        public UdpSession(uint conv, EndPoint clientEndPoint, UdpServer server)
-        {
-            this.conv      = conv;
-            this.server    = server;
-            SessionID      = conv;
-            remoteEndPoint = clientEndPoint;
-            IsConnected    = true;
-            recvBuffer     = new ByteBuffer(NetworkCommon.UdpRecvBuffer);
+            isClosed  = false;
+            this.conv = conv;
 
-            nextUpdateTimeMs = Utils.IClock();
+            recvData = new byte[NetworkCommon.UdpRecvBuffer];
+            recvBuffer = new ByteBuffer(NetworkCommon.MaxPackageSize);
+            recvSAEA = new SocketAsyncEventArgs();
+            recvSAEA.Completed += OnRecvCompleted;
+
+            isSending = false;
+            sendSAEA = new SocketAsyncEventArgs();
+            sendSAEA.Completed += OnSendCompleted;
+            toBeSendQueue = new Queue<ArraySegment<byte>>();
 
             kcp = new KCP(conv, KcpOut);
 
-            // TODO: 配置KCP参数
             lock(kcp)
             {
                 kcp.NoDelay(1, 10, 2, 1);
-
-                // 设置接收窗口/发送窗口
                 kcp.WndSize(NetworkCommon.KcpSendWnd, NetworkCommon.KcpRecvWnd);
             }
-
         }
 
         public void Dispose()
         {
+            recvSAEA.Dispose();
+            sendSAEA.Dispose();
+            
+            socket.Dispose();
         }
 
-        // 关闭UDP会话
         public override void Close()
         {
-            IsConnected = false;
-            base.Close();
+            isClosed = true;
+
+            recvSAEA.Completed -= OnRecvCompleted;
+            sendSAEA.Completed -= OnSendCompleted;
+
+            toBeSendQueue.Clear();
+            socket.Close();
+
+            OnDisconnected?.Invoke(this);
         }
 
-        // KCP更新
+        public uint KcpToken { get { return conv; } }
+
         public void Update()
         {
-            if (IsConnected)
+            if (!isClosed)
             {
                 KcpUpdate(Utils.IClock());
             }
         }
 
-        #region 发送数据
-        // 发送网络消息
-        public override void SendMessage(int msgID, ByteBuffer buffer)
+        // KCP定时Update
+        private void KcpUpdate(UInt32 currentMs)
         {
-            lock(kcp)
+            if (currentMs >= nextUpdateTimeMs)
             {
-                // TODO: 需要调优
-                if (kcp.WaitSnd() >= NetworkCommon.KcpSendWnd)
+                lock(kcp)
                 {
-                    // 累积太多KCP数据没有发送，也可以调高接收/发送窗口
-                    Close();
-                    return;
+                    kcp.Update(currentMs);
+                    nextUpdateTimeMs = kcp.Check(currentMs);
                 }
 
-                // 打包消息
-                var data = MessageHeader.Encoding(msgID, buffer);
-
-                // 将消息交给KCP
-                int ret = kcp.Send(data.Buffer);
-                Debug.Assert(ret == 0, "Send Data to KCP Failed!", "UDP");
-
-                kcp.Flush();
+                CheckKcpReceiveMessage();
             }
         }
 
-        private void KcpOut(byte[] buff, int size)
+        #region 接收消息
+        // 开始接收网络消息
+        public override void StartReceive()
         {
-            Debug.Assert(server != null, "UdpServer不存在！", "UdpSession");
+            if (peerEndPoint == null)
+            {
+                recvSAEA.RemoteEndPoint = new IPEndPoint(IPAddress.Any, 0);
+            }
+            else
+            {
+                recvSAEA.RemoteEndPoint = peerEndPoint;
+            }
+
+            recvSAEA.SetBuffer(recvData, 0, recvData.Length);
 
             try
             {
-                if (!IsConnected)
+                if (!socket.ReceiveFromAsync(recvSAEA))
                 {
-                    return;
+                    OnRecvCompleted(this, recvSAEA);
                 }
-
-                // 将KCP中消息通过UDP Server发送给目标
-                byte[] b = new byte[size];
-                Array.Copy(buff, 0, b, 0, size);
-
-                // 发送到网络
-                server.SendMessage(b, remoteEndPoint);
             }
             catch (Exception e)
             {
-                ShouldBeClose(e);
+                HandleException(e);
             }
         }
-        #endregion
 
-        #region 接收数据
+        // 异步接收数据返回
+        private void OnRecvCompleted(object sender, SocketAsyncEventArgs e)
+        {
+            if (isClosed)
+            {
+                return;
+            }
+
+            if (e.BytesTransferred <= 0 || e.SocketError != SocketError.Success)
+            {
+                HandleException(new InvalidOperationException("Udp接收返回0或出错"));
+                return;
+            }
+
+            if (peerEndPoint == null)
+            {
+                // 记录第一个包的EndPoint
+                // FIXME: 此方案并不安全
+                peerEndPoint = e.RemoteEndPoint;
+            }
+
+            byte[] data = new byte[e.BytesTransferred];
+            Array.Copy(e.Buffer, 0, data, 0, e.BytesTransferred);
+
+            OnReceiveMessage(data);
+
+            // 继续收取
+            StartReceive();
+        }
+
         // "处理"收到的网络消息
-        public void OnReceiveMessage(byte[] buff)
+        private void OnReceiveMessage(byte[] buff)
         {
             lock(kcp)
             {
@@ -123,11 +157,12 @@ namespace Base.Network
                 kcp.Flush();
             }
 
-            CheckReceiveKcpMessage();
+            // 检查是否有KCP消息收取
+            CheckKcpReceiveMessage();
         }
 
-        // 检查KCP是否有消息需要处理
-        private void CheckReceiveKcpMessage()
+        // 检查是否有KCP消息收取
+        private void CheckKcpReceiveMessage()
         {
             lock(kcp)
             {
@@ -137,26 +172,30 @@ namespace Base.Network
                     byte[] b = new byte[sz];
                     if (kcp.Recv(b) > 0)
                     {
-                        // 处理收到的消息
+                        // 将消息分发
                         ProcessReceivedMessage(b);
                     }
                 }
             }
         }
 
-        private void ProcessReceivedMessage(byte[] buff)
+        // 处理收到的KCP消息
+        private void ProcessReceivedMessage(byte[] data)
         {
-            recvBuffer.WriteBytes(buff);
+            // 将收到的数据写入到接收缓存
+            recvBuffer.WriteBytes(data);
 
             int msgID = -1;
+            int cookie;
             byte[] msg = null;
 
             try
             {
-                while ((msg = MessageHeader.TryDecode(recvBuffer, out msgID, out int cookie)) != null)
+                // 尝试解码消息
+                while ((msg = MessageHeader.TryDecode(recvBuffer, out msgID, out cookie)) != null)
                 {
                     // 将消息分发
-                    triggerMessageReceived(this, msgID, msg);
+                    OnMessageReceived?.Invoke(this, msgID, msg);
                 }
             }
             catch (Exception e)
@@ -168,42 +207,312 @@ namespace Base.Network
         }
         #endregion
 
-        // 检查异常原因，关闭会话
-        private void ShouldBeClose(Exception e)
+        #region 发送消息
+        // 发送消息(至KCP)
+        public override void SendMessage(int MsgID, ByteBuffer data)
         {
-            Console.WriteLine("捕捉到异常！Message: {0}\nStackTrace: {1}\n", e.Message, e.StackTrace);
-            Close();
-        }
+            // 添加消息头
+            var buff = MessageHeader.Encoding(MsgID, data);
 
-        // 定时调用
-        // TODO: 调用频繁，每个连接一个
-        private void KcpUpdate(UInt32 currentMs)
-        {
-
-            if (currentMs >= nextUpdateTimeMs)
+            lock(kcp)
             {
-                lock(kcp)
+                // TODO: 需要调优
+                if (kcp.WaitSnd() == NetworkCommon.KcpSendWnd)
                 {
-                    kcp.Update(currentMs);
-                    nextUpdateTimeMs = kcp.Check(currentMs);
+                    // 累积太多KCP数据没有发送，也可以调高接收/发送窗口
+                    Utils.logger.Warn(string.Format("{0} KCP发送窗口[{1}]已满", ToString(), kcp.WaitSnd()), "UdpSession");
+                    Close();
+                    return;
                 }
 
-                CheckReceiveKcpMessage();
+                // 交给KCP
+                int ret = kcp.Send(buff.Buffer);
+                Debug.Assert(ret == 0, "Send Data into KCP Failed", this.ToString());
+
+                kcp.Flush();
             }
         }
 
-        public override void startReceive()
+        // 发送KCP数据
+        private void KcpOut(byte[] data, int size)
         {
+            try
+            {
+                // 将KCP消息发送给服务器
+                byte[] b = new byte[size];
+                Array.Copy(data, 0, b, 0, size);
+
+                // 发送至网络
+                SendToPeer(b);
+            }
+            catch (Exception e)
+            {
+                HandleException(e);
+            }
         }
 
-        private EndPoint remoteEndPoint;
-        private UdpServer server;
-        private ByteBuffer recvBuffer;
+        // 发送Buffer网络
+        private void SendToPeer(byte[] buff)
+        {
+            if (isClosed)
+            {
+                return;
+            }
+
+            lock(toBeSendQueue)
+            {
+                if (isSending)
+                {
+                    // 正在发送中，写入发送队列
+                    toBeSendQueue.Enqueue(new ArraySegment<byte>(buff));
+                    if (toBeSendQueue.Count >= NetworkCommon.MaxCacheMessage)
+                    {
+                        // 消息缓存数超过上限
+                        Debug.Write(string.Format("Session[{0}]消息缓存数超过上限！强制关闭连接", KcpToken), ToString());
+                        Close();
+                    }
+
+                    return;
+                }
+
+                isSending = true;
+            }
+
+            // 直接发送
+            var sendQueue = new SendingQueue(buff);
+            SendToSocket(sendQueue);
+       }
+
+        // 通过socket发送消息
+        private void SendToSocket(SendingQueue queue)
+        {
+            try
+            {
+                sendSAEA.UserToken = queue;
+                sendSAEA.SetBuffer(null, 0, 0);
+                sendSAEA.BufferList = queue;
+
+                var ret = socket.SendAsync(sendSAEA);
+                if (!ret)
+                {
+                    // 同步完成
+                    OnSendCompleted(null, sendSAEA);
+                }
+            }
+            catch (Exception e)
+            {
+                HandleException(e);
+            }
+        }
+
+        // SendAsync回调
+        private void OnSendCompleted(object sender, SocketAsyncEventArgs e)
+        {
+            if (isClosed)
+            {
+                return;
+            }
+
+            SendingQueue srcQueue = e.UserToken as SendingQueue;
+
+            if (e.BytesTransferred <= 0 || e.SocketError != SocketError.Success)
+            {
+                HandleException(new Exception(string.Format("{0} 发送消息错误！socket返回错误[{1}]或发送0字节", ToString(), e.SocketError)));
+                return;
+            }
+
+            if (srcQueue.Trim(e.BytesTransferred))
+            {
+                // 全部发送完毕
+
+                ArraySegment<byte>[] arr;
+                lock(toBeSendQueue)
+                {
+                    int count = toBeSendQueue.Count;
+                    if (count == 0)
+                    {
+                        // 没有缓存数据
+                        isSending = false;
+                        return;
+                    }
+
+                    // 读出缓存数据
+                    arr = new ArraySegment<byte>[count];
+                    for (int i = 0; i < count; ++i)
+                    {
+                        arr[i] = toBeSendQueue.Dequeue();
+                    }
+                }
+
+                // 发送缓存数据
+                SendToSocket(new SendingQueue(arr));
+            }
+            else
+            {
+                // 还有部分数据没有发送
+                SendToSocket(srcQueue);
+            }
+        }
+
+        // 正在发送的队列
+        public sealed class SendingQueue : IList<ArraySegment<byte>>
+        {
+            private int count;
+            private ArraySegment<byte>[] sendList;
+            private int interOffset;
+
+            public SendingQueue(ArraySegment<byte>[] sendList)
+            {
+                this.sendList = sendList;
+                this.interOffset = 0;
+                this.count = sendList.Length;
+            }
+
+            public SendingQueue(byte[] bs)
+            {
+                ArraySegment<byte>[] arr = new ArraySegment<byte>[1];
+                arr[0] = new ArraySegment<byte>(bs);
+                this.sendList = arr;
+                this.interOffset = 0;
+                this.count = 1;
+            }
+
+            public bool IsReadOnly
+            {
+                get
+                {
+                    return true;
+                }
+            }
+
+            public int Count
+            {
+                get
+                {
+                    return count - interOffset;
+                }
+            }
+
+            public int IndexOf(ArraySegment<byte> item)
+            {
+                throw new NotSupportedException();
+            }
+
+            public void Insert(int index, ArraySegment<byte> item)
+            {
+                throw new NotSupportedException();
+            }
+
+            public void RemoveAt(int index)
+            {
+                throw new NotSupportedException();
+            }
+
+            public ArraySegment<byte> this[int index]
+            {
+                get
+                {
+                    int _index = interOffset + index;
+                    return sendList[_index];
+                }
+                set
+                {
+                    throw new NotSupportedException();
+                }
+            }
+
+            public void Add(ArraySegment<byte> item)
+            {
+                throw new NotSupportedException();
+            }
+
+            public void Clear()
+            {
+                throw new NotSupportedException();
+            }
+
+            public bool Contains(ArraySegment<byte> item)
+            {
+                throw new NotSupportedException();
+            }
+
+            public void CopyTo(ArraySegment<byte>[] array, int arrayIndex)
+            {
+                for (int i = 0; i < Count; i++)
+                {
+                    array[arrayIndex + i] = this[i];
+                }
+            }
+
+            public bool Remove(ArraySegment<byte> item)
+            {
+                throw new NotSupportedException();
+            }
+
+            public IEnumerator<ArraySegment<byte>> GetEnumerator()
+            {
+                for (int i = 0; i < Count; i++)
+                {
+                    yield return sendList[interOffset + i];
+                }
+            }
+
+            System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+            {
+                return GetEnumerator();
+            }
+
+            // 剔除掉已发送数据长度
+            public bool Trim(int sentLen)
+            {
+                int total = 0;
+                int count = Count;
+                for (int i = 0; i < count; i++)
+                {
+                    var segment = sendList[interOffset];
+                    total += segment.Count;
+                    if (total <= sentLen)
+                    {
+                        ++interOffset;
+                        continue;
+                    }
+                    int rest = total - sentLen;
+                    sendList[interOffset] = new ArraySegment<byte>(segment.Array, segment.Offset + segment.Count - rest, rest);
+                    return false;
+                }
+                // 全部发送完毕
+                return true;
+            }
+        }
+        #endregion
+
+        // 异常处理
+        private void HandleException(Exception e)
+        {
+            Utils.logger.Error(string.Format("发生错误！Message: {0}\nStackTrace: {1}", e.Message, e.StackTrace), "UdpSession");
+            Close();
+        }
+
+        public override string ToString()
+        {
+            return string.Format("UdpSession[sessionID: {0} KcpToken: {1}]", SessionID, KcpToken);
+        }
+        private Socket socket;
+        private bool isClosed;
+        private EndPoint peerEndPoint;
+
+        private byte[]               recvData;
+        private ByteBuffer           recvBuffer;
+        private SocketAsyncEventArgs recvSAEA;
+
+        private bool isSending;
+        private SocketAsyncEventArgs        sendSAEA;
+        private Queue<ArraySegment<byte>>   toBeSendQueue;
 
         #region KCP相关
-        private uint conv;
-        private KCP  kcp;
-        private UInt32 nextUpdateTimeMs;
+        private uint    conv;
+        private KCP     kcp;
+        private UInt32  nextUpdateTimeMs;
         #endregion
     }
 }

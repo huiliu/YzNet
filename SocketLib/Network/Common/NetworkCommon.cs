@@ -10,6 +10,9 @@ namespace Base.Network
         // 最大缓存消息数
         public const int MaxCacheMessage = 5000;
 
+        // 当消息长度超过此值，自动进行压缩
+        public const int CompressThreshold = 1024 * 2;
+
         // TCP
         public const int TcpSendBuffer = 1024 * 16;
         public const int TcpRecvBuffer = 1024 * 16;
