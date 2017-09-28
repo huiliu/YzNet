@@ -8,7 +8,7 @@ namespace Base.Network
     // 表示一个会话，可能是TCP，也可能是UDP
     public abstract class INetSession
     {
-        public uint SessionID { get; set; }
+        public long SessionID { get; set; }
 
         public abstract void Close();
 

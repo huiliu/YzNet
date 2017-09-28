@@ -43,7 +43,7 @@ namespace Base.Network
 
         public override string ToString()
         {
-            return string.Format("Session[{0}]\nTotalSendBytes: {1}\nTotalRecvBytes: {2}\nCallSendAsyncCount: {3}\nSendPacket: {4}\nRecvPacket: {5}\nSendByQueue: {6}",
+            return string.Format("------------\nSession[{0}]\nTotalSendBytes: {1}\nTotalRecvBytes: {2}\nCallSendAsyncCount: {3}\nSendPacket: {4}\nRecvPacket: {5}\nSendByQueue: {6}\n-----------\n",
                 s.SessionID,
                 TotalSendBytes, TotalRecvBytes,
                 CallSendAsyncCount,

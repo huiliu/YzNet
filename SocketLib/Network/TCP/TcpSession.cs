@@ -23,7 +23,7 @@ namespace Base.Network
 
             recvSAEA      = new SocketAsyncEventArgs();
             recvSAEA.Completed  += RecvSAEACompleted;
-            recvBuffer    = new ByteBuffer(NetworkCommon.MaxPackageSize);
+            recvBuffer    = new ByteBuffer(NetworkCommon.MaxPackageSize + 100);
 
             isSending     = false;
             sendSAEA      = new SocketAsyncEventArgs();
@@ -137,7 +137,14 @@ namespace Base.Network
         // 发送Buffer
         public override void SendMessage(int msgID, ByteBuffer data)
         {
-            SendMessageImpl(msgID, data);
+            if (!isClosed)
+            {
+                SendMessageImpl(msgID, data);
+            }
+            else
+            {
+                Utils.logger.Error(string.Format("Socket已经关闭!"), "TcpSession");
+            }
         }
 
         // 发送Buffer
@@ -154,7 +161,7 @@ namespace Base.Network
                     ++statistics.SendByQueue;
 
                     // 正在发送中，写入发送队列
-                    toBeSendQueue.Enqueue(new ArraySegment<byte>(buff.Buffer));
+                    toBeSendQueue.Enqueue(new ArraySegment<byte>(buff.ReadAll()));
                     if (toBeSendQueue.Count >= NetworkCommon.MaxCacheMessage)
                     {
                         // 消息缓存数超过上限
@@ -162,6 +169,8 @@ namespace Base.Network
                         Close();
                     }
 
+                    Console.WriteLine(string.Format("TcpServer[{0}]当前发送队列长度为：{1}", SessionID, toBeSendQueue.Count), "TcpSession");
+                    Utils.logger.Error(string.Format("TcpServer[{0}]当前发送队列长度为：{1}", SessionID, toBeSendQueue.Count), "TcpSession");
                     return;
                 }
 
@@ -169,7 +178,7 @@ namespace Base.Network
             }
 
             // 直接发送
-            var sendQueue = new SendingQueue(buff.Buffer);
+            var sendQueue = new SendingQueue(buff.ReadAll());
             SendToSocket(sendQueue);
        }
 
@@ -209,10 +218,10 @@ namespace Base.Network
                 return;
             }
 
+            Console.WriteLine("TcpSession[{0}]发送返回[{1}]!", SessionID, e.BytesTransferred);
             SendingQueue srcQueue;
             srcQueue = e.UserToken as SendingQueue;
 
-            Console.WriteLine("sendMessage: {0}bytes", e.BytesTransferred);
             if (srcQueue.Trim(e.BytesTransferred))
             {
                 statistics.TotalSendBytes += e.BytesTransferred;
