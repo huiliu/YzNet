@@ -9,8 +9,9 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>SocketLib</RootNamespace>
     <AssemblyName>SocketLib</AssemblyName>
-    <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.7</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -64,6 +65,7 @@
     <Compile Include="Network\TCP\Connector.cs" />
     <Compile Include="Network\TCP\TcpServer.cs" />
     <Compile Include="Network\TCP\TcpSession.cs" />
+    <Compile Include="Network\UDP\UdpServer.cs" />
     <Compile Include="Network\UDP\UdpSession.cs" />
     <Compile Include="Network\Utils\NetStatistics.cs" />
     <Compile Include="Network\Utils\Utils.cs" />

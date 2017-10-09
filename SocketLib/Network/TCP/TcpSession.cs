@@ -111,10 +111,11 @@ namespace Base.Network
             // 尝试解析并分发消息
             int msgID = -1;
             byte[] msg = null;
+            int cookie = -1;
 
             try
             {
-                while ((msg = MessageHeader.TryDecode(recvBuffer, out msgID, out int cookie)) != null)
+                while ((msg = MessageHeader.TryDecode(recvBuffer, out msgID, out cookie)) != null)
                 {
                     ++statistics.RecvPacketCount;
                     OnMessageReceived?.Invoke(this, msgID, msg);
