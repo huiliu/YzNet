@@ -48,7 +48,7 @@ namespace Base.Network
 
         public void Dispose()
         {
-            socket.Dispose();
+            //socket.Dispose();
             recvSAEA.Dispose();
             sendSAEA.Dispose();
         }

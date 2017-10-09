@@ -323,6 +323,12 @@ namespace Base.Network
             }
 
             Debug.Assert(clientEndPoint != null, "没有对端地址！", "UdpSession");
+#if DEBUG
+            // TODO: 有BUG，如果此处不new一个新的SocketAsyncEventArgs，不一会儿就会返回AddressFamilyNotSupport的错误
+            // https://stackoverflow.com/questions/15485999/c-sharp-net-4-0-4-5-udp-send-issue
+            sendSAEA = new SocketAsyncEventArgs();
+            sendSAEA.Completed += onSendCompleted;
+#endif
 
             sendSAEA.RemoteEndPoint = clientEndPoint;
             sendSAEA.SetBuffer(data, 0, data.Length);

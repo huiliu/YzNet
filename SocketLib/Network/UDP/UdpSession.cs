@@ -46,7 +46,7 @@ namespace Base.Network
             recvSAEA.Dispose();
             sendSAEA.Dispose();
             
-            socket.Dispose();
+            //socket.Dispose();
         }
 
         public override void Close()
@@ -226,7 +226,7 @@ namespace Base.Network
                 }
 
                 // 交给KCP
-                int ret = kcp.Send(buff.Buffer);
+                int ret = kcp.Send(buff.ReadAll());
                 Debug.Assert(ret == 0, "Send Data into KCP Failed", this.ToString());
 
                 kcp.Flush();

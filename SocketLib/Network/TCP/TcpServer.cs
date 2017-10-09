@@ -67,7 +67,7 @@ namespace Base.Network
         public void Dispose()
         {
             acceptSAEA.Dispose();
-            socket.Dispose();
+            //socket.Dispose();
         }
 
         // 接收新连接进入

@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SocketLib", "SocketLib\Sock
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example", "Example\Example.csproj", "{FA215B08-2373-49D9-A92A-3BBFD430C3E6}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UdpTest", "UdpTest\UdpTest.csproj", "{F050DD53-4192-4F8E-AD2C-D6A4D5E3ADBC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{FA215B08-2373-49D9-A92A-3BBFD430C3E6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FA215B08-2373-49D9-A92A-3BBFD430C3E6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FA215B08-2373-49D9-A92A-3BBFD430C3E6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F050DD53-4192-4F8E-AD2C-D6A4D5E3ADBC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F050DD53-4192-4F8E-AD2C-D6A4D5E3ADBC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F050DD53-4192-4F8E-AD2C-D6A4D5E3ADBC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F050DD53-4192-4F8E-AD2C-D6A4D5E3ADBC}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

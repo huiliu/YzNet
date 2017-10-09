@@ -4,16 +4,18 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{EFC12F3D-D7F3-4803-A287-61771B3D9552}</ProjectGuid>
-    <OutputType>Library</OutputType>
+    <ProjectGuid>{F050DD53-4192-4F8E-AD2C-D6A4D5E3ADBC}</ProjectGuid>
+    <OutputType>Exe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>SocketLib</RootNamespace>
-    <AssemblyName>SocketLib</AssemblyName>
+    <RootNamespace>UdpTest</RootNamespace>
+    <AssemblyName>UdpTest</AssemblyName>
     <TargetFrameworkVersion>v4.7</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
@@ -24,6 +26,7 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
@@ -33,12 +36,12 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="NLog, Version=4.0.0.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c, processorArchitecture=MSIL">
-      <HintPath>..\packages\NLog.4.4.12\lib\net45\NLog.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Threading.Tasks.Dataflow, Version=4.5.24.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Tpl.Dataflow.4.5.24\lib\portable-net45+win8+wpa81\System.Threading.Tasks.Dataflow.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -47,36 +50,19 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="LZ4\LZ4Codec.cs" />
-    <Compile Include="LZ4\LZ4Codec.Safe.cs" />
-    <Compile Include="LZ4\LZ4Codec.Safe32.Dirty.cs" />
-    <Compile Include="LZ4\LZ4Codec.Safe32HC.Dirty.cs" />
-    <Compile Include="LZ4\LZ4Codec.Safe64.Dirty.cs" />
-    <Compile Include="LZ4\LZ4Codec.Safe64HC.Dirty.cs" />
-    <Compile Include="Network\Common\ByteBuffer.cs" />
-    <Compile Include="Network\Common\DNS.cs" />
-    <Compile Include="Network\Common\INetSession.cs" />
-    <Compile Include="Network\UDP\KCP.cs" />
-    <Compile Include="Network\Common\MessageDispatcher.cs" />
-    <Compile Include="Network\Common\MessageHeader.cs" />
-    <Compile Include="Network\Common\NetworkCommon.cs" />
-    <Compile Include="Network\RPC\Handler\RpcRequest.cs" />
-    <Compile Include="Network\RPC\Handler\RpcResponse.cs" />
-    <Compile Include="Network\RPC\RPCManager.cs" />
-    <Compile Include="Network\RPC\RpcSession.cs" />
-    <Compile Include="Network\TCP\Connector.cs" />
-    <Compile Include="Network\TCP\TcpServer.cs" />
-    <Compile Include="Network\TCP\TcpSession.cs" />
-    <Compile Include="Network\UDP\UdpServer.cs" />
-    <Compile Include="Network\UDP\UdpSession.cs" />
-    <Compile Include="Network\Utils\NetStatistics.cs" />
-    <Compile Include="Network\Utils\Utils.cs" />
+    <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="App.config" />
     <None Include="packages.config" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <ProjectReference Include="..\SocketLib\SocketLib.csproj">
+      <Project>{efc12f3d-d7f3-4803-a287-61771b3d9552}</Project>
+      <Name>SocketLib</Name>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
